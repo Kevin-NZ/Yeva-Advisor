@@ -2767,7 +2767,6 @@ export default function YevaAdvisor() {
   const [mana, setMana] = useState("3");
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [advice, setAdvice] = useState([]);
-  const [analyzed, setAnalyzed] = useState(false);
 
   // Each card is unique — adding to one zone removes it from the other two
   const addTo = (zone) => (card) => {
@@ -2779,19 +2778,9 @@ export default function YevaAdvisor() {
   };
   const removeFrom = (setter) => (card) => setter(prev => prev.filter(c => c !== card));
 
-  const analyze = () => {
-    const results = analyzeGameState({
-      hand, battlefield, graveyard,
-      manaAvailable: mana,
-      isMyTurn,
-    });
-    setAdvice(results);
-    setAnalyzed(true);
-  };
-
   const reset = () => {
     setHand([]); setBattlefield([]); setGraveyard([]);
-    setMana("3"); setIsMyTurn(false); setAdvice([]); setAnalyzed(false);
+    setMana("3"); setIsMyTurn(false); setAdvice([]);
   };
 
   // Live analysis as state changes
@@ -2799,7 +2788,6 @@ export default function YevaAdvisor() {
     if (hand.length + battlefield.length > 0) {
       const results = analyzeGameState({ hand, battlefield, graveyard, manaAvailable: mana, isMyTurn });
       setAdvice(results);
-      setAnalyzed(true);
     }
   }, [hand, battlefield, graveyard, mana, isMyTurn]);
 
@@ -2811,7 +2799,8 @@ export default function YevaAdvisor() {
     <>
       <style>{fonts}</style>
       <style>{`
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body, #root { margin: 0; padding: 0; background: ${COLORS.bg}; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #07100788; }
         ::-webkit-scrollbar-thumb { background: #2d5a2d; border-radius: 3px; }
@@ -2941,25 +2930,11 @@ export default function YevaAdvisor() {
               onAdd={addTo("graveyard")} onRemove={removeFrom(setGraveyard)}
               placeholder="Cards in your graveyard…" />
 
-            {/* Analyze Button */}
-            <button onClick={analyze} style={{
-              width: "100%", padding: "14px",
-              background: `linear-gradient(135deg, ${COLORS.green1}33, ${COLORS.green2}22)`,
-              border: `1px solid ${COLORS.green1}`,
-              borderRadius: "8px", color: COLORS.green3,
-              fontFamily: "'Cinzel', serif", fontSize: "13px",
-              fontWeight: 700, letterSpacing: "2px",
-              cursor: "pointer", transition: "all 0.2s",
-              marginTop: "8px",
-            }}
-              onMouseEnter={e => { e.target.style.background = `linear-gradient(135deg, ${COLORS.green1}55, ${COLORS.green2}44)`; }}
-              onMouseLeave={e => { e.target.style.background = `linear-gradient(135deg, ${COLORS.green1}33, ${COLORS.green2}22)`; }}
-            >⟩ ANALYZE POSITION</button>
           </div>
 
           {/* RIGHT PANEL — Advice */}
           <div style={{ flex: 1, padding: "20px 24px", overflowY: "auto" }}>
-            {!analyzed || advice.length === 0 ? (
+            {advice.length === 0 ? (
               <div style={{
                 display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center",
