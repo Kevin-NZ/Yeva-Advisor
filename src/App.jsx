@@ -562,6 +562,85 @@ const COMBOS = [
 ];
 
 // ============================================================
+
+// ============================================================
+// EASTER EGG — secret card names that trigger special responses
+// ============================================================
+const SECRET_CARDS = {
+  "Black Lotus": {
+    lines: [
+      "Ah yes, the Black Lotus. That would certainly help the mana situation.",
+      "Sadly, it's not in the 99. Or the 100. Or legal in this format.",
+      "Perhaps consider Gaea's Cradle as a spiritual successor.",
+    ],
+    color: "#9b59b6",
+    emoji: "🪷",
+  },
+  "Thassa's Oracle": {
+    lines: [
+      "A worthy win condition — but this is a mono-green deck.",
+      "We win by out-ramping everyone and bouncing creatures, not peering into the abyss.",
+      "Though if you had Thassa's Oracle, you'd probably just cast Demonic Consultation and end it there.",
+    ],
+    color: "#2980b9",
+    emoji: "🔮",
+  },
+  "Sol Ring": {
+    lines: [
+      "Sol Ring is already in the deck. But nice try.",
+      "…wait, is it? Check the Rocks & Artifacts section.",
+      "If you're asking because someone just blew it up, that's a valid reason to feel bad.",
+    ],
+    color: "#f1c40f",
+    emoji: "💍",
+  },
+  "Emrakul, the Aeons Torn": {
+    lines: [
+      "Fifteen mana. Sure, we could get there.",
+      "With infinite mana this is technically castable.",
+      "Though at that point you've already won via Sanitarium. But respect the ambition.",
+    ],
+    color: "#e74c3c",
+    emoji: "🦑",
+  },
+  "Yeva's Ghost": {
+    lines: [
+      "She's not a card. Yet.",
+      "But her spirit guides every forest walk you take.",
+      "Nature's Herald would be proud.",
+    ],
+    color: "#27ae60",
+    emoji: "👻",
+  },
+  "Forest": {
+    lines: [
+      "Yes. More forests. This is correct.",
+      "Have you considered… more forests?",
+      "Yavimaya agrees. Everything is a forest. Everything.",
+    ],
+    color: "#27ae60",
+    emoji: "🌲",
+  },
+  "Swamp": {
+    lines: [
+      "This is a mono-green deck.",
+      "There are no swamps here.",
+      "There will never be swamps here.",
+    ],
+    color: "#2c3e50",
+    emoji: "🚫",
+  },
+  "Lightning Bolt": {
+    lines: [
+      "Wrong colour. Wrong format. Wrong deck.",
+      "Though it would kill Endurance, which is admittedly relevant.",
+      "Green has Beast Within. Close enough.",
+    ],
+    color: "#e67e22",
+    emoji: "⚡",
+  },
+};
+
 // CARD CATEGORIES for display
 // ============================================================
 const CATEGORIES = {
@@ -2541,9 +2620,21 @@ function CardInput({ label, zone, cards, onAdd, onRemove, placeholder }) {
   const [input, setInput] = useState("");
   const [suggs, setSuggs] = useState([]);
 
+  const [secret, setSecret] = useState(null);
+
   const handleChange = (v) => {
     setInput(v);
     if (v.length < 2) { setSuggs([]); return; }
+    // Check for secret card names first
+    const secretMatch = Object.keys(SECRET_CARDS).find(
+      k => k.toLowerCase() === v.toLowerCase()
+    );
+    if (secretMatch) {
+      setSecret(SECRET_CARDS[secretMatch]);
+      setSuggs([]);
+      return;
+    }
+    setSecret(null);
     setSuggs(ALL_CARD_NAMES.filter(n =>
       n.toLowerCase().includes(v.toLowerCase()) && !cards.includes(n)
     ).slice(0, 7));
@@ -2553,6 +2644,7 @@ function CardInput({ label, zone, cards, onAdd, onRemove, placeholder }) {
     onAdd(name);
     setInput("");
     setSuggs([]);
+    setSecret(null);
   };
 
   const zoneColors = { hand: COLORS.green1, battlefield: COLORS.green3, graveyard: COLORS.textDim };
@@ -2635,6 +2727,29 @@ function CardInput({ label, zone, cards, onAdd, onRemove, placeholder }) {
                 )}
               </div>
             ))}
+          </div>
+        )}
+        {secret && (
+          <div style={{
+            position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200,
+            background: "#0d1a0d", border: `1px solid ${secret.color}55`,
+            borderRadius: "6px", padding: "14px 16px",
+            boxShadow: `0 12px 40px rgba(0,0,0,0.8), 0 0 20px ${secret.color}22`,
+          }}>
+            <div style={{ fontSize: "20px", marginBottom: "8px" }}>{secret.emoji}</div>
+            {secret.lines.map((line, i) => (
+              <div key={i} style={{
+                fontSize: "13px", fontFamily: "'Crimson Text', serif",
+                color: i === 0 ? secret.color : COLORS.textMid,
+                fontStyle: i > 0 ? "italic" : "normal",
+                marginBottom: i < secret.lines.length - 1 ? "6px" : 0,
+                lineHeight: 1.5,
+              }}>{line}</div>
+            ))}
+            <div style={{ marginTop: "10px", fontSize: "11px", color: COLORS.textDim,
+              fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>
+              — NOT IN THE 99 —
+            </div>
           </div>
         )}
       </div>
@@ -2757,7 +2872,7 @@ export default function YevaAdvisor() {
   const [mana, setMana] = useState("3");
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [advice, setAdvice] = useState([]);
-
+  const [showDebug, setShowDebug] = useState(false);
   // Each card is unique — adding to one zone removes it from the other two
   const addTo = (zone) => (card) => {
     if (zone !== "hand")        setHand(prev        => prev.filter(c => c !== card));
@@ -2836,6 +2951,16 @@ export default function YevaAdvisor() {
             }}>
               {creaturesOnBoard} creatures · {elvesOnBoard} elves · {devotionOnBoard}🌲 devotion
             </div>
+            <button onClick={() => setShowDebug(true)} style={{
+              background: "none", border: `1px solid ${COLORS.border}`,
+              borderRadius: "6px", padding: "5px 14px",
+              color: COLORS.textDim, cursor: "pointer",
+              fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
+              transition: "all 0.2s",
+            }}
+              onMouseEnter={e => { e.target.style.borderColor = "#5dade2"; e.target.style.color = "#5dade2"; }}
+              onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
+            >⌗ DEBUG</button>
             <button onClick={reset} style={{
               background: "none", border: `1px solid ${COLORS.border}`,
               borderRadius: "6px", padding: "5px 14px",
@@ -2847,6 +2972,111 @@ export default function YevaAdvisor() {
               onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
             >↺ RESET</button>
           </div>
+
+          {/* DEBUG MODAL */}
+          {showDebug && (
+            <div style={{
+              position: "fixed", inset: 0, zIndex: 1000,
+              background: "rgba(0,0,0,0.75)", display: "flex",
+              alignItems: "center", justifyContent: "center",
+              padding: "20px",
+            }} onClick={() => setShowDebug(false)}>
+              <div style={{
+                background: "#0d1f0d", border: `1px solid ${COLORS.borderBright}`,
+                borderRadius: "10px", padding: "24px", maxWidth: "780px", width: "100%",
+                maxHeight: "80vh", overflowY: "auto",
+                fontFamily: "monospace", fontSize: "12px", color: COLORS.text,
+              }} onClick={e => e.stopPropagation()}>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <span style={{ fontFamily: "'Cinzel', serif", fontSize: "13px", color: COLORS.green3, letterSpacing: "2px" }}>
+                    ⌗ DEBUG — STATE DUMP
+                  </span>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={() => {
+                      const dump = {
+                        version: `v${__APP_VERSION__} (${__GIT_HASH__})`,
+                        turn: isMyTurn ? "My Turn" : "Opponent's Turn",
+                        mana: Number(mana),
+                        hand, battlefield, graveyard,
+                        derived: { creaturesOnBoard, elvesOnBoard, devotionOnBoard },
+                        advice: advice.map(a => ({ priority: a.priority, category: a.category, headline: a.headline })),
+                      };
+                      navigator.clipboard.writeText(JSON.stringify(dump, null, 2));
+                    }} style={{
+                      background: "#1a3a1a", border: `1px solid ${COLORS.border}`,
+                      borderRadius: "5px", padding: "4px 10px",
+                      color: COLORS.textMid, cursor: "pointer", fontSize: "11px",
+                    }}>📋 Copy JSON</button>
+                    <button onClick={() => setShowDebug(false)} style={{
+                      background: "none", border: `1px solid ${COLORS.border}`,
+                      borderRadius: "5px", padding: "4px 10px",
+                      color: COLORS.textDim, cursor: "pointer", fontSize: "11px",
+                    }}>✕ Close</button>
+                  </div>
+                </div>
+
+                {[
+                  { label: "VERSION", value: `v${__APP_VERSION__} (${__GIT_HASH__})` },
+                  { label: "TURN",    value: isMyTurn ? "My Turn" : "Opponent's Turn" },
+                  { label: "MANA",    value: mana },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ marginBottom: "10px" }}>
+                    <div style={{ color: "#5dade2", marginBottom: "3px", letterSpacing: "1px" }}>{label}</div>
+                    <div style={{ paddingLeft: "12px", color: COLORS.textMid }}>{value}</div>
+                  </div>
+                ))}
+
+                {[
+                  { label: "HAND",        cards: hand },
+                  { label: "BATTLEFIELD", cards: battlefield },
+                  { label: "GRAVEYARD",   cards: graveyard },
+                ].map(({ label, cards }) => (
+                  <div key={label} style={{ marginBottom: "10px" }}>
+                    <div style={{ color: "#5dade2", marginBottom: "3px", letterSpacing: "1px" }}>
+                      {label} <span style={{ color: COLORS.textDim }}>({cards.length})</span>
+                    </div>
+                    {cards.length === 0
+                      ? <div style={{ paddingLeft: "12px", color: COLORS.textDim, fontStyle: "italic" }}>empty</div>
+                      : cards.map(c => (
+                          <div key={c} style={{ paddingLeft: "12px", color: COLORS.textMid }}>
+                            · {c} <span style={{ color: COLORS.textDim }}>({CARDS[c]?.type}, cmc {CARDS[c]?.cmc})</span>
+                          </div>
+                        ))
+                    }
+                  </div>
+                ))}
+
+                <div style={{ marginBottom: "10px" }}>
+                  <div style={{ color: "#5dade2", marginBottom: "3px", letterSpacing: "1px" }}>DERIVED</div>
+                  <div style={{ paddingLeft: "12px", color: COLORS.textMid }}>
+                    · {creaturesOnBoard} creatures · {elvesOnBoard} elves · {devotionOnBoard} devotion
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ color: "#5dade2", marginBottom: "3px", letterSpacing: "1px" }}>
+                    ADVISOR OUTPUT <span style={{ color: COLORS.textDim }}>({advice.length} suggestions, sorted by priority)</span>
+                  </div>
+                  {advice.length === 0
+                    ? <div style={{ paddingLeft: "12px", color: COLORS.textDim, fontStyle: "italic" }}>no advice generated</div>
+                    : [...advice].sort((a,b) => b.priority - a.priority).map((a, i) => (
+                        <div key={i} style={{
+                          marginBottom: "5px",
+                          borderLeft: `2px solid ${a.color ?? COLORS.border}`,
+                          paddingLeft: "10px",
+                        }}>
+                          <span style={{ color: COLORS.textDim }}>[{a.priority}]</span>{" "}
+                          <span style={{ color: a.color ?? COLORS.text }}>{a.category}</span>{" "}
+                          <span style={{ color: COLORS.textMid }}>— {a.headline}</span>
+                        </div>
+                      ))
+                  }
+                </div>
+
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{
