@@ -1565,25 +1565,6 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   }
 
   // ---- CROP ROTATION FOR KEY LAND ----
-  if (inHand.has("Crop Rotation")) {
-    const keyLands = ["Gaea's Cradle","Itlimoc, Cradle of the Sun","Nykthos, Shrine to Nyx","Geier Reach Sanitarium","Wirewood Lodge","Deserted Temple"];
-    const missingKeyLands = keyLands.filter(l => !board.has(l));
-    if (missingKeyLands.length > 0 && (mana >= 1 || infiniteManaActive)) {
-      results.push({
-        priority: 7,
-        category: "🏔️ LAND TUTOR",
-        headline: `Crop Rotation → ${missingKeyLands[0]}`,
-        detail: `Crop Rotation is instant speed — use it at the perfect moment. ${missingKeyLands[0]} is your highest-priority missing land.`,
-        steps: [
-          `Sacrifice a tapped land. Search for ${missingKeyLands[0]}.`,
-          missingKeyLands[0] === "Gaea's Cradle" ? "Cradle immediately taps for mana equal to your creatures — often 4-6+ mana in one shot." :
-          missingKeyLands[0] === "Nykthos, Shrine to Nyx" ? "Nykthos: spend {2}, tap for green mana equal to your green devotion. Often produces 8-12+ mana." :
-          "This land is key to your next combo line."
-        ],
-        color: "#5dade2",
-      });
-    }
-  }
 
 
 
@@ -1719,6 +1700,53 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     return false;
   })();
 
+  if (inHand.has("Crop Rotation")) {
+    const keyLands = ["Gaea's Cradle","Itlimoc, Cradle of the Sun","Nykthos, Shrine to Nyx","Geier Reach Sanitarium","Wirewood Lodge","Deserted Temple"];
+    const missingKeyLands = keyLands.filter(l => !board.has(l));
+
+    // Check if Sanitarium is the only thing standing between us and a win-mill line
+    // Sanitarium is the only thing needed to execute the mill win:
+    // infinite mana active + Endurance available. The untap method is implicit
+    // in whichever infinite-mana combo is already running.
+    const sanitariumWinsNow = (
+      !board.has("Geier Reach Sanitarium") &&
+      infiniteManaActive &&
+      (board.has("Endurance") || inHand.has("Endurance"))
+    );
+
+    if (sanitariumWinsNow && (mana >= 1 || infiniteManaActive)) {
+      results.push({
+        priority: 14,
+        category: "🔥 WIN NOW — FETCH SANITARIUM",
+        headline: "Crop Rotation → Geier Reach Sanitarium — WIN THIS TURN",
+        detail: "Infinite mana is established, Endurance is ready, and an untap method is in place. Sanitarium is the only missing piece. Crop Rotation fetches it at instant speed — execute the mill win immediately.",
+        steps: [
+          "Sacrifice a tapped land. Search for Geier Reach Sanitarium and put it onto the battlefield.",
+          "Sanitarium enters tapped — untap it with your chosen method.",
+          "Begin the Sanitarium mill loop: activate repeatedly, resetting your graveyard with Endurance ETB each cycle.",
+          "Opponents draw from an empty library — state-based loss.",
+        ],
+        color: "#ff6b35",
+      });
+    } else if (missingKeyLands.length > 0 && (mana >= 1 || infiniteManaActive)) {
+      results.push({
+        priority: 7,
+        category: "🏔️ LAND TUTOR",
+        headline: `Crop Rotation → ${missingKeyLands[0]}`,
+        detail: `Crop Rotation is instant speed — use it at the perfect moment. ${missingKeyLands[0]} is your highest-priority missing land.`,
+        steps: [
+          `Sacrifice a tapped land. Search for ${missingKeyLands[0]}.`,
+          missingKeyLands[0] === "Gaea's Cradle" ? "Cradle immediately taps for mana equal to your creatures — often 4-6+ mana in one shot." :
+          missingKeyLands[0] === "Nykthos, Shrine to Nyx" ? "Nykthos: spend {2}, tap for green mana equal to your green devotion. Often produces 8-12+ mana." :
+          missingKeyLands[0] === "Geier Reach Sanitarium" ? "Sanitarium is your mill win condition — fetch it when infinite mana and Endurance are ready." :
+          "This land is key to your next combo line."
+        ],
+        color: "#5dade2",
+      });
+    }
+  }
+
+
   // ---- CHECK ACTIVE COMBOS ----
   for (const combo of COMBOS) {
     const missing = combo.requires.filter(r => !board.has(r) && !inHand.has(r));
@@ -1762,33 +1790,37 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       }
     } else if (missing.length === 1 && extras.ok) {
       // One named piece missing
-      const missingCard = missing[0];
-      const tutorOptions = getTutorOptions(missingCard, hand, battlefield, mana);
-      if (tutorOptions.length > 0) {
-        results.push({
-          priority: combo.priority + 1,
-          category: "🎯 ONE PIECE AWAY",
-          headline: `Find ${missingCard} to enable ${combo.name}`,
-          detail: `Use ${tutorOptions[0]} to find ${missingCard}. ${combo.description}`,
-          steps: [`Use ${tutorOptions.join(" or ")} to find ${missingCard}.`, ...combo.lines],
-          combo: combo.id,
-          color: "#58d68d",
-        });
+      if (combo.type !== "infinite-mana" || !infiniteManaActive) {
+        const missingCard = missing[0];
+        const tutorOptions = getTutorOptions(missingCard, hand, battlefield, mana);
+        if (tutorOptions.length > 0) {
+          results.push({
+            priority: combo.priority + 1,
+            category: "🎯 ONE PIECE AWAY",
+            headline: `Find ${missingCard} to enable ${combo.name}`,
+            detail: `Use ${tutorOptions[0]} to find ${missingCard}. ${combo.description}`,
+            steps: [`Use ${tutorOptions.join(" or ")} to find ${missingCard}.`, ...combo.lines],
+            combo: combo.id,
+            color: "#58d68d",
+          });
+        }
       }
     } else if (missing.length === 0 && !extras.ok) {
       // Named pieces present but need an extra condition satisfied
-      const tutorOptions = getTutorOptions(extras.missing, hand, battlefield, mana);
-      results.push({
-        priority: combo.priority,
-        category: "🔧 NEARLY THERE",
-        headline: `${combo.name} — still need: ${extras.missing}`,
-        detail: `You have the core pieces for ${combo.name} but still need ${extras.missing} to satisfy the mana threshold. ${combo.description}`,
-        steps: tutorOptions.length > 0
-          ? [`Use ${tutorOptions.join(" or ")} to find ${extras.missing}.`, ...combo.lines]
-          : [`Find ${extras.missing} to complete this combo.`, ...combo.lines],
-        combo: combo.id,
-        color: "#85c1e9",
-      });
+      if (combo.type !== "infinite-mana" || !infiniteManaActive) {
+        const tutorOptions = getTutorOptions(extras.missing, hand, battlefield, mana);
+        results.push({
+          priority: combo.priority,
+          category: "🔧 NEARLY THERE",
+          headline: `${combo.name} — still need: ${extras.missing}`,
+          detail: `You have the core pieces for ${combo.name} but still need ${extras.missing} to satisfy the mana threshold. ${combo.description}`,
+          steps: tutorOptions.length > 0
+            ? [`Use ${tutorOptions.join(" or ")} to find ${extras.missing}.`, ...combo.lines]
+            : [`Find ${extras.missing} to complete this combo.`, ...combo.lines],
+          combo: combo.id,
+          color: "#85c1e9",
+        });
+      }
     }
   }
 
