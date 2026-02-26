@@ -402,20 +402,19 @@ const COMBOS = [
     name: "Sanitarium Mill — Temur Variant (Endurance ETB on Stack + Temur Sabertooth)",
     description: "Use Endurance's ETB as a floating 'library reset shield' while looping Sanitarium infinitely. Cast Endurance, hold its ETB on the stack, bounce Endurance with Sabertooth (ETB stays on stack), then loop Sanitarium until all opponents' libraries are empty. Requires infinite mana + a Sanitarium untap method.",
     requires: ["Geier Reach Sanitarium", "Endurance", "Temur Sabertooth"],
-    needsAlso: ["Deserted Temple", "Magus of the Candelabra"],
+    needsInfiniteMana: true,
+    needsUntapLand: true,
     priority: 10,
     type: "win-mill",
     lines: [
-      "SETUP: Infinite mana established. Geier Reach Sanitarium on battlefield with an untap method (Deserted Temple, Magus of the Candelabra, or Argothian Elder via Ashaya). Temur Sabertooth on battlefield.",
+      "SETUP: Infinite mana established. Geier Reach Sanitarium on battlefield with an untap method. Temur Sabertooth on battlefield.",
       "STEP 1: Cast Endurance. Pass priority.",
       "STEP 2: Endurance resolves, enters the battlefield. Its ETB trigger goes on the stack. Hold priority — do NOT let it resolve yet.",
       "STEP 3: Pay {1}{G} — activate Temur Sabertooth, bouncing Endurance back to hand. Pass priority. (The ETB trigger remains on the stack even though Endurance has left the battlefield.)",
-      "STEP 4: Pay {2}, activate Geier Reach Sanitarium: each player draws a card then discards a card. Hold priority.",
+      "STEP 4: Pay {2}, activate Geier Reach Sanitarium. Hold priority.",
       "STEP 5: Untap Geier Reach Sanitarium using your chosen method. Pass priority.",
-      "STEP 6: Repeat steps 4–5 until all opponents' libraries are exhausted.",
-      "STEP 7: Allow the Endurance ETB to resolve — target yourself, shuffling your graveyard back into your library (protecting you from decking).",
-      "STEP 8: Recast Endurance to create a new ETB shield and repeat if needed.",
-      "RESULT: Opponents attempt to draw from an empty library on the next Sanitarium activation — state-based loss.",
+      "STEP 6: Repeat steps 1–5.",
+      "RESULT: Each player draws a card, then discards a card. Put all cards from our graveyard on the bottom of the library. Each player draws a card, then discards a card... etc. Opponents will draw from an empty library — state-based loss.",
     ]
   },
 
@@ -425,7 +424,8 @@ const COMBOS = [
     name: "Sanitarium Mill — Kogla Variant (Endurance + Kogla + Eternal Witness)",
     description: "Kill Endurance while its ETB is suspended on the stack (using Beast Within or Legolas's Quick Reflexes), then loop it back via Eternal Witness + Kogla. The ETB stays on the stack as protection while you loop Sanitarium. LQR only needs to be cast once per turn — its tap triggers persist and kill Endurance each iteration.",
     requires: ["Geier Reach Sanitarium", "Endurance", "Kogla, the Titan Ape", "Eternal Witness"],
-    needsAlso: ["Deserted Temple", "Magus of the Candelabra"],
+    needsInfiniteMana: true,
+    needsUntapLand: true,
     needsRemoval: true,
     priority: 10,
     type: "win-mill",
@@ -452,6 +452,8 @@ const COMBOS = [
     name: "Sanitarium Mill — Ashaya Variant (Endurance + Quirion/Scryb Ranger + LQR)",
     description: "Uses the Ashaya infinite Ranger loop as the Sanitarium untap engine. Legolas's Quick Reflexes is cast once; its tap triggers kill both Endurance and the Ranger while Endurance's First ETB is still on the stack. A Second Endurance ETB (from recasting) resets your graveyard, returning Endurance and the Ranger to your library so Duskwatch Recruiter can find them again to continue the loop.",
     requires: ["Geier Reach Sanitarium", "Endurance", "Ashaya, Soul of the Wild", "Legolas's Quick Reflexes"],
+    needsInfiniteMana: true,
+    needsUntapLand: true,
     needsRanger: true,
     priority: 10,
     type: "win-mill",
@@ -562,6 +564,25 @@ const COMBOS = [
 ];
 
 // ============================================================
+
+// ============================================================
+// URL STATE — compress JSON with DeflateRaw, base64 encode into ?s= param
+// ============================================================
+async function compressState(obj) {
+  const json = JSON.stringify(obj);
+  const stream = new Blob([json]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+  const buf = await new Response(stream).arrayBuffer();
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); // URL-safe base64
+}
+
+async function decompressState(encoded) {
+  const bin = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
+  const buf = Uint8Array.from(bin, c => c.charCodeAt(0));
+  const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  const text = await new Response(stream).text();
+  return JSON.parse(text);
+}
 
 // ============================================================
 // EASTER EGG — secret card names that trigger special responses
@@ -767,81 +788,49 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       if (!hasRanger) return { ok: false, missing: "Quirion Ranger or Scryb Ranger" };
     }
 
+    // needsInfiniteMana: requires infinite mana to already be established
+    if (combo.needsInfiniteMana && !infiniteManaActive) {
+      return { ok: false, missing: "infinite mana (establish a mana loop first)" };
+    }
+
+    // needsUntapLand: combo requires a way to repeatedly untap Geier Reach Sanitarium.
+    // Valid methods:
+    //   1. Woodcaller Automaton (ETB untaps a land)
+    //   2. Destiny Spinner + Hyrax Tower Scout (animate land, Scout untaps)
+    //   3. Ashaya + Magus of the Candelabra (creatures are lands, Magus untaps X)
+    //   4. Ashaya + Quirion Ranger (return Forest to hand = untap a land)
+    //   5. Ashaya + Scryb Ranger (same, instant speed)
+    //   6. Wirewood Symbiote + Destiny Spinner (Spinner animates land, Symbiote untaps via elf bounce)
+    //   7. Ashaya + Argothian Elder (tap Elder to untap 2 lands)
+    if (combo.needsUntapLand) {
+      const hasAshaya      = board.has("Ashaya, Soul of the Wild");
+      const hasQuirion     = board.has("Quirion Ranger")  || inHand.has("Quirion Ranger");
+      const hasScryb       = board.has("Scryb Ranger")    || inHand.has("Scryb Ranger");
+      const hasMagus       = board.has("Magus of the Candelabra");
+      const hasElder       = board.has("Argothian Elder");
+      const hasSpinner     = board.has("Destiny Spinner");
+      const hasHyrax       = board.has("Hyrax Tower Scout");
+      const hasSymbiote    = board.has("Wirewood Symbiote");
+      const hasWoodcaller  = board.has("Woodcaller Automaton") || inHand.has("Woodcaller Automaton");
+
+      const hasUntapMethod =
+        hasWoodcaller ||                          // 1. Woodcaller Automaton
+        (hasSpinner && hasHyrax) ||               // 2. Destiny Spinner + Hyrax Tower Scout
+        (hasAshaya && hasMagus) ||                // 3. Ashaya + Magus of the Candelabra
+        (hasAshaya && hasQuirion) ||              // 4. Ashaya + Quirion Ranger
+        (hasAshaya && hasScryb) ||                // 5. Ashaya + Scryb Ranger
+        (hasSymbiote && hasSpinner) ||            // 6. Wirewood Symbiote + Destiny Spinner
+        (hasAshaya && hasElder);                  // 7. Ashaya + Argothian Elder
+
+      if (!hasUntapMethod) return {
+        ok: false,
+        missing: "a land untap method: Woodcaller Automaton; Destiny Spinner + Hyrax Tower Scout; Ashaya + Magus/Quirion Ranger/Scryb Ranger/Argothian Elder; or Wirewood Symbiote + Destiny Spinner",
+      };
+    }
+
     return { ok: true };
   }
 
-  // ---- CHECK ACTIVE COMBOS ----
-  for (const combo of COMBOS) {
-    const missing = combo.requires.filter(r => !board.has(r) && !inHand.has(r));
-    const extras = comboExtrasSatisfied(combo);
-
-    if (missing.length === 0 && extras.ok) {
-      // Type metadata: label, headline prefix, priority boost, color
-      const typeMeta = {
-        "infinite-mana": { ready: "⚙️ INFINITE MANA ONLINE", cast: "⚡ CAST TO ENABLE MANA LOOP",  readyPrefix: "LOOP READY:",  boost: 2, color: "#58d68d" },
-        "win-mill":      { ready: "🔥 WIN NOW — MILL",        cast: "⚡ ASSEMBLE MILL WIN",          readyPrefix: "EXECUTE:",     boost: 5, color: "#ff6b35" },
-        "win-poison":    { ready: "🔥 WIN NOW — POISON",      cast: "⚡ ASSEMBLE POISON WIN",        readyPrefix: "EXECUTE:",     boost: 5, color: "#27ae60" },
-        "win-draw":      { ready: "📚 DRAW YOUR LIBRARY",     cast: "⚡ ASSEMBLE DRAW LOOP",         readyPrefix: "EXECUTE:",     boost: 4, color: "#5dade2" },
-        "win-combat":    { ready: "🔥 WIN NOW — COMBAT",      cast: "⚡ ASSEMBLE COMBAT WIN",        readyPrefix: "EXECUTE:",     boost: 5, color: "#e74c3c" },
-        "engine":        { ready: "🔄 ENGINE READY",          cast: "⚡ ACTIVATE ENGINE",            readyPrefix: "ACTIVATE:",    boost: 1, color: "#a569bd" },
-      }[combo.type] || { ready: "🔄 COMBO ASSEMBLED",  cast: "⚡ ASSEMBLE COMBO", readyPrefix: "EXECUTE:", boost: 3, color: "#58d68d" };
-
-      const needToCast = combo.requires.filter(r => inHand.has(r));
-      if (needToCast.length === 0) {
-        results.push({
-          priority: combo.priority + typeMeta.boost,
-          category: typeMeta.ready,
-          headline: `${typeMeta.readyPrefix} ${combo.name}`,
-          detail: combo.description,
-          steps: combo.lines,
-          combo: combo.id,
-          color: typeMeta.color,
-        });
-      } else {
-        const totalCost = needToCast.reduce((acc, c) => acc + (CARDS[c]?.cmc || 0), 0);
-        if (mana >= totalCost || !isMyTurn) {
-          results.push({
-            priority: combo.priority + typeMeta.boost - 2,
-            category: typeMeta.cast,
-            headline: `Cast ${needToCast.join(" + ")} → ${combo.name}`,
-            detail: `You have all named pieces! Cast ${needToCast.join(", ")} to complete ${combo.name}.`,
-            steps: combo.lines,
-            combo: combo.id,
-            color: typeMeta.color,
-          });
-        }
-      }
-    } else if (missing.length === 1 && extras.ok) {
-      // One named piece missing
-      const missingCard = missing[0];
-      const tutorOptions = getTutorOptions(missingCard, hand, battlefield, mana);
-      if (tutorOptions.length > 0) {
-        results.push({
-          priority: combo.priority + 1,
-          category: "🎯 ONE PIECE AWAY",
-          headline: `Find ${missingCard} to enable ${combo.name}`,
-          detail: `Use ${tutorOptions[0]} to find ${missingCard}. ${combo.description}`,
-          steps: [`Use ${tutorOptions.join(" or ")} to find ${missingCard}.`, ...combo.lines],
-          combo: combo.id,
-          color: "#58d68d",
-        });
-      }
-    } else if (missing.length === 0 && !extras.ok) {
-      // Named pieces present but need an extra condition satisfied
-      const tutorOptions = getTutorOptions(extras.missing, hand, battlefield, mana);
-      results.push({
-        priority: combo.priority,
-        category: "🔧 NEARLY THERE",
-        headline: `${combo.name} — still need: ${extras.missing}`,
-        detail: `You have the core pieces for ${combo.name} but still need ${extras.missing} to satisfy the mana threshold. ${combo.description}`,
-        steps: tutorOptions.length > 0
-          ? [`Use ${tutorOptions.join(" or ")} to find ${extras.missing}.`, ...combo.lines]
-          : [`Find ${extras.missing} to complete this combo.`, ...combo.lines],
-        combo: combo.id,
-        color: "#85c1e9",
-      });
-    }
-  }
 
   // ---- YEVA FLASH TIMING ADVICE ----
   if (!isMyTurn && board.has("Yeva, Nature's Herald")) {
@@ -980,7 +969,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       "Woodland Bellower ETB: search for any non-legendary green CMC≤3 creature onto battlefield.",
       "Best Bellower targets: Duskwatch Recruiter (win con), Elvish Reclaimer (land tutor), Destiny Spinner (haste+protection), Eternal Witness, Quirion Ranger.",
     ] : [];
-    if (hasSacTarget && mana >= 4) {
+    if (hasSacTarget && (mana >= 4 || infiniteManaActive)) {
       results.push({
         priority: 8,
         category: "🎯 TUTOR",
@@ -991,7 +980,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         steps: [
           `Cast Natural Order ({2}{G}{G}): sacrifice ${has3drop ? "a 3-drop creature (most efficient)" : "any green creature"} → search for ${primaryTarget}.`,
           ...bellowerFollow,
-          ...(mana >= 4 && !has3drop ? ["Tip: 3-drop creatures are the optimal sacrifice — they maximise the mana efficiency of the exchange."] : []),
+          ...((mana >= 4 || infiniteManaActive) && !has3drop ? ["Tip: 3-drop creatures are the optimal sacrifice — they maximise the mana efficiency of the exchange."] : []),
         ],
         color: "#5dade2",
       });
@@ -1005,7 +994,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     // Or: sac 3-drop → find CMC<=5 (Ashaya!)
     const sacCandidates = battlefield.filter(c => CARDS[c]?.type === "creature")
       .sort((a,b) => (CARDS[a]?.cmc ?? 0) - (CARDS[b]?.cmc ?? 0));
-    if (sacCandidates.length > 0 && mana >= 3) {
+    if (sacCandidates.length > 0 && (mana >= 3 || infiniteManaActive)) {
       const bestSac = sacCandidates[0]; // lowest CMC to sacrifice
       const maxCmc  = (CARDS[bestSac]?.cmc ?? 1) + 2;
       // Find the best missing target at or below maxCmc
@@ -1056,7 +1045,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { name: "Elvish Reclaimer",      xCost: 1, reason: "land tutor for Cradle / Sanitarium / Nykthos" },
       { name: "Ashaya, Soul of the Wild", xCost: 5, reason: "combo engine — all creatures become Forests" },
       { name: "Eternal Witness",       xCost: 3, reason: "retrieve key piece from graveyard" },
-    ].filter(t => !board.has(t.name) && mana >= t.xCost + 1);
+    ].filter(t => !board.has(t.name) && (mana >= t.xCost + 1 || infiniteManaActive));
     if (gsTargets.length > 0) {
       const best = gsTargets[0];
       results.push({
@@ -1085,7 +1074,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { name: "Destiny Spinner",       xCost: 2, reason: "haste + uncounterable protection" },
       { name: "Quirion Ranger",        xCost: 1, reason: "infinite mana loop with Ashaya" },
       { name: "Elvish Reclaimer",      xCost: 1, reason: "land tutor" },
-    ].filter(t => !board.has(t.name) && mana >= t.xCost + 1);
+    ].filter(t => !board.has(t.name) && (mana >= t.xCost + 1 || infiniteManaActive));
     if (nrTargets.length > 0) {
       const best = nrTargets[0];
       results.push({
@@ -1105,7 +1094,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   }
 
   // ---- SYLVAN SCRYING ----
-  if (inHand.has("Sylvan Scrying") && isMyTurn && mana >= 2) {
+  if (inHand.has("Sylvan Scrying") && isMyTurn && (mana >= 2 || infiniteManaActive)) {
     const scryfLands = [
       { land: "Gaea's Cradle",           reason: "taps for {G} per creature — often 4-8+ mana immediately" },
       { land: "Itlimoc, Cradle of the Sun", reason: `taps for {G} per creature (${creaturesOnBoard} now) — Gaea's Cradle as a land, if Cradle is already in play` },
@@ -1142,7 +1131,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     ].filter(l => !board.has(l.land));
     if (mycospawnLands.length > 0) {
       const best = mycospawnLands[0];
-      const castable = inHand.has("Sowing Mycospawn") && mana >= 5;
+      const castable = inHand.has("Sowing Mycospawn") && (mana >= 5 || infiniteManaActive);
       results.push({
         priority: castable ? 7 : 6,
         category: "🏔️ LAND TUTOR",
@@ -1160,7 +1149,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   }
 
   // ---- SHARED SUMMONS ----
-  if (inHand.has("Shared Summons") && mana >= 5) {
+  if (inHand.has("Shared Summons") && (mana >= 5 || infiniteManaActive)) {
     // Finds any two creatures, instant speed — great end-step setup
     const sharedTargets = [
       "Duskwatch Recruiter","Ashaya, Soul of the Wild","Eternal Witness",
@@ -1194,7 +1183,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     const regalInHand   = inHand.has("Regal Force");
     const hasBouncer    = board.has("Temur Sabertooth") || board.has("Kogla, the Titan Ape");
     const bouncer       = board.has("Temur Sabertooth") ? "Temur Sabertooth" : "Kogla, the Titan Ape";
-    const regalCastable = regalInHand && (infiniteManaActive || mana >= 7) && isMyTurn;
+    const regalCastable = regalInHand && (infiniteManaActive || (mana >= 7 || infiniteManaActive)) && isMyTurn;
     const regalActive   = (regalOnBoard || regalCastable) && hasBouncer && infiniteManaActive;
 
     if (regalActive) {
@@ -1291,7 +1280,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { name: "Disciple of Freyalise",cmc: 6, reason: "draw 2+ cards and gain life on ETB, sac engine" },
     ].filter(t => !board.has(t.name));
     if (empathTargets.length > 0) {
-      const castable = inHand.has("Fierce Empath") && mana >= 3;
+      const castable = inHand.has("Fierce Empath") && (mana >= 3 || infiniteManaActive);
       const etbReady = board.has("Fierce Empath");
       if (castable || etbReady) {
         const best = empathTargets[0];
@@ -1331,7 +1320,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { name: "Chomping Changeling",    reason: "elf body that counts for all elf synergies" },
     ].filter(t => !board.has(t.name));
     if (harbingerTargets.length > 0) {
-      const castable = inHand.has("Elvish Harbinger") && mana >= 3;
+      const castable = inHand.has("Elvish Harbinger") && (mana >= 3 || infiniteManaActive);
       const etbReady = board.has("Elvish Harbinger");
       if (castable || etbReady) {
         const best = harbingerTargets[0];
@@ -1440,7 +1429,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   // card in your graveyard (it's still a land).
   // Key use: copy a lost combo piece from graveyard — acts as a fifth copy of Ashaya,
   // Quirion Ranger, Argothian Elder, etc. when opponents remove them.
-  if (board.has("Shifting Woodland") && mana >= 4) {
+  if (board.has("Shifting Woodland") && (mana >= 4 || infiniteManaActive)) {
     // Find the most valuable permanent card in the graveyard to copy
     const gravePriority = [
       "Ashaya, Soul of the Wild",     // combo engine — all creatures become Forests
@@ -1508,7 +1497,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   // At end of turn, if you control 4+ creatures it transforms into Itlimoc, Cradle of the Sun.
   // Itlimoc taps for {G} per creature — Gaea's Cradle on a land.
   {
-    const ritesCast     = inHand.has("Growing Rites of Itlimoc") && mana >= 4 && isMyTurn;
+    const ritesCast     = inHand.has("Growing Rites of Itlimoc") && (mana >= 4 || infiniteManaActive) && isMyTurn;
     const ritesOnBoard  = board.has("Growing Rites of Itlimoc");
     const itlimocOnBoard= board.has("Itlimoc, Cradle of the Sun");
     const transformReady= creaturesOnBoard >= 4;
@@ -1576,7 +1565,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   if (inHand.has("Crop Rotation")) {
     const keyLands = ["Gaea's Cradle","Itlimoc, Cradle of the Sun","Nykthos, Shrine to Nyx","Geier Reach Sanitarium","Wirewood Lodge","Deserted Temple"];
     const missingKeyLands = keyLands.filter(l => !board.has(l));
-    if (missingKeyLands.length > 0 && mana >= 1) {
+    if (missingKeyLands.length > 0 && (mana >= 1 || infiniteManaActive)) {
       results.push({
         priority: 7,
         category: "🏔️ LAND TUTOR",
@@ -1643,7 +1632,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   }
 
   // ---- STAX ADVICE ----
-  if (inHand.has("Collector Ouphe") && mana >= 2) {
+  if (inHand.has("Collector Ouphe") && (mana >= 2 || infiniteManaActive)) {
     results.push({
       priority: 5,
       category: "🔒 STAX",
@@ -1727,9 +1716,85 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     return false;
   })();
 
+  // ---- CHECK ACTIVE COMBOS ----
+  for (const combo of COMBOS) {
+    const missing = combo.requires.filter(r => !board.has(r) && !inHand.has(r));
+    const extras = comboExtrasSatisfied(combo);
+
+    if (missing.length === 0 && extras.ok) {
+      // Type metadata: label, headline prefix, priority boost, color
+      const typeMeta = {
+        "infinite-mana": { ready: "⚙️ INFINITE MANA ONLINE", cast: "⚡ CAST TO ENABLE MANA LOOP",  readyPrefix: "LOOP READY:",  boost: 2, color: "#58d68d" },
+        "win-mill":      { ready: "🔥 WIN NOW — MILL",        cast: "⚡ ASSEMBLE MILL WIN",          readyPrefix: "EXECUTE:",     boost: 5, color: "#ff6b35" },
+        "win-poison":    { ready: "🔥 WIN NOW — POISON",      cast: "⚡ ASSEMBLE POISON WIN",        readyPrefix: "EXECUTE:",     boost: 5, color: "#27ae60" },
+        "win-draw":      { ready: "📚 DRAW YOUR LIBRARY",     cast: "⚡ ASSEMBLE DRAW LOOP",         readyPrefix: "EXECUTE:",     boost: 4, color: "#5dade2" },
+        "win-combat":    { ready: "🔥 WIN NOW — COMBAT",      cast: "⚡ ASSEMBLE COMBAT WIN",        readyPrefix: "EXECUTE:",     boost: 5, color: "#e74c3c" },
+        "engine":        { ready: "🔄 ENGINE READY",          cast: "⚡ ACTIVATE ENGINE",            readyPrefix: "ACTIVATE:",    boost: 1, color: "#a569bd" },
+      }[combo.type] || { ready: "🔄 COMBO ASSEMBLED",  cast: "⚡ ASSEMBLE COMBO", readyPrefix: "EXECUTE:", boost: 3, color: "#58d68d" };
+
+      const needToCast = combo.requires.filter(r => inHand.has(r));
+      if (needToCast.length === 0) {
+        results.push({
+          priority: combo.priority + typeMeta.boost,
+          category: typeMeta.ready,
+          headline: `${typeMeta.readyPrefix} ${combo.name}`,
+          detail: combo.description,
+          steps: combo.lines,
+          combo: combo.id,
+          color: typeMeta.color,
+        });
+      } else {
+        const totalCost = needToCast.reduce((acc, c) => acc + (CARDS[c]?.cmc || 0), 0);
+        if ((mana >= totalCost || infiniteManaActive) || !isMyTurn) {
+          results.push({
+            priority: combo.priority + typeMeta.boost - 2,
+            category: typeMeta.cast,
+            headline: `Cast ${needToCast.join(" + ")} → ${combo.name}`,
+            detail: `You have all named pieces! Cast ${needToCast.join(", ")} to complete ${combo.name}.`,
+            steps: combo.lines,
+            combo: combo.id,
+            color: typeMeta.color,
+          });
+        }
+      }
+    } else if (missing.length === 1 && extras.ok) {
+      // One named piece missing
+      const missingCard = missing[0];
+      const tutorOptions = getTutorOptions(missingCard, hand, battlefield, mana);
+      if (tutorOptions.length > 0) {
+        results.push({
+          priority: combo.priority + 1,
+          category: "🎯 ONE PIECE AWAY",
+          headline: `Find ${missingCard} to enable ${combo.name}`,
+          detail: `Use ${tutorOptions[0]} to find ${missingCard}. ${combo.description}`,
+          steps: [`Use ${tutorOptions.join(" or ")} to find ${missingCard}.`, ...combo.lines],
+          combo: combo.id,
+          color: "#58d68d",
+        });
+      }
+    } else if (missing.length === 0 && !extras.ok) {
+      // Named pieces present but need an extra condition satisfied
+      const tutorOptions = getTutorOptions(extras.missing, hand, battlefield, mana);
+      results.push({
+        priority: combo.priority,
+        category: "🔧 NEARLY THERE",
+        headline: `${combo.name} — still need: ${extras.missing}`,
+        detail: `You have the core pieces for ${combo.name} but still need ${extras.missing} to satisfy the mana threshold. ${combo.description}`,
+        steps: tutorOptions.length > 0
+          ? [`Use ${tutorOptions.join(" or ")} to find ${extras.missing}.`, ...combo.lines]
+          : [`Find ${extras.missing} to complete this combo.`, ...combo.lines],
+        combo: combo.id,
+        color: "#85c1e9",
+      });
+    }
+  }
+
+
   // Endurance is required for any Sanitarium mill win — it prevents self-decking.
   // Check if it's accessible: on board, in hand and castable, or in the graveyard
   // (retrievable by Eternal Witness). Flash means it can be cast at instant speed.
+  const yevaFlash         = board.has("Yeva, Nature's Herald");
+
   const enduranceOnBoard     = board.has("Endurance");
   const enduranceInHand      = inHand.has("Endurance");
   const enduranceInGrave     = inGrave.has("Endurance");
@@ -1745,7 +1810,6 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   // Direct: on board, in hand on our turn, or in hand with Yeva (flash)
   const duskwatchOnBoard  = board.has("Duskwatch Recruiter");
   const duskwatchInHand   = inHand.has("Duskwatch Recruiter");
-  const yevaFlash         = board.has("Yeva, Nature's Herald");
   const duskwatchDirect   = duskwatchOnBoard
     || (duskwatchInHand && isMyTurn)
     || (duskwatchInHand && yevaFlash);
@@ -1756,12 +1820,12 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     "Archdruid's Charm"]  // Archdruid's Charm mode 2: find any green creature → hand (instant speed)
     .filter(t => {
       if (!inHand.has(t)) return false;
-      if (t === "Archdruid's Charm") return mana >= 3; // costs {G}{G}{G}
+      if (t === "Archdruid's Charm") return (mana >= 3 || infiniteManaActive); // costs {G}{G}{G}
       if (t === "Chord of Calling") {
         // Convoke: tap creatures to pay. For a CMC-2 target: {2}{G}{G}{G} = 5 total cost.
         // Each creature tapped reduces cost by 1. Effective mana = max(0, 5 - creaturesOnBoard)
         const chordEffectiveMana = Math.max(0, 5 - creaturesOnBoard);
-        return mana >= chordEffectiveMana; // castable if we can cover the remainder
+        return (mana >= chordEffectiveMana || infiniteManaActive); // castable if we can cover the remainder
       }
       return true;
     });
@@ -1872,9 +1936,6 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     // Determine which pile pieces are already on board
     const pileNeeded = ["Destiny Spinner","Elvish Reclaimer","Ashaya, Soul of the Wild",
       "Temur Sabertooth","Endurance"].filter(c => !board.has(c));
-    const untapPieceOptions = ["Woodcaller Automaton","Hyrax Tower Scout","Magus of the Candelabra",
-      "Quirion Ranger","Scryb Ranger","Wirewood Symbiote","Argothian Elder"];
-    const hasUntapPiece = untapPieceOptions.some(c => board.has(c));
 
     results.push({
       priority: enduranceReady ? 15 : 11,
@@ -1950,25 +2011,9 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         // Only a true win con if infinite mana is live AND a Sanitarium untap method is already on board
         priority: (() => {
           if (!infiniteManaActive) return 5;
-          // Determine which infinite mana combo is active, so we don't double-count its pieces
-          // as also being the Sanitarium untap method.
-          // Woodcaller+Temur is the mana engine — its ETB targets Cradle/Nykthos, not Sanitarium.
-          // It can only untap Sanitarium by redirecting the ETB, which breaks the mana loop.
-          // So Woodcaller+Temur only counts as an untap method if something ELSE is generating
-          // infinite mana (i.e. a second independent infinite mana source exists).
-          const woodcallerIsTheManaEngine =
-            board.has("Woodcaller Automaton") && board.has("Temur Sabertooth") &&
-            (board.has("Gaea's Cradle") || board.has("Nykthos, Shrine to Nyx"));
-          const hasIndependentManaSource = COMBOS.some(c => {
-            if (c.type !== "infinite-mana" || c.id === "sabertooth_woodcaller") return false;
-            const allOnBoard = c.requires.every(r => board.has(r));
-            if (!allOnBoard) return false;
-            const extras = comboExtrasSatisfied(c);
-            return extras.ok;
-          });
           const hasUntapMethod =
             // Woodcaller+Temur only valid if they're NOT the sole mana engine
-            (board.has("Woodcaller Automaton") && board.has("Temur Sabertooth") && (!woodcallerIsTheManaEngine || hasIndependentManaSource)) ||
+            (board.has("Woodcaller Automaton") && board.has("Temur Sabertooth")) ||
             (board.has("Hyrax Tower Scout") && board.has("Destiny Spinner")) ||
             (board.has("Ashaya, Soul of the Wild") && board.has("Magus of the Candelabra")) ||
             (board.has("Ashaya, Soul of the Wild") && (board.has("Quirion Ranger") || board.has("Scryb Ranger")) && board.has("Destiny Spinner")) ||
@@ -2061,7 +2106,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         const isActivated = ["Fauna Shaman","Survival of the Fittest"].includes(t);
         const isBellower  = t === "Woodland Bellower";
         const isSpeaker   = t === "Formidable Speaker";
-        if (isInstant)   return t === "Archdruid's Charm" ? mana >= 3 : true;
+        if (isInstant)   return t === "Archdruid's Charm" ? (mana >= 3 || infiniteManaActive) : true;
         if (isActivated) return board.has(t) && (isMyTurn || yevaFlash);
         if (isBellower)  return inHand.has(t) && (isMyTurn || yevaFlash);
         if (isSpeaker)   return board.has(t) && speakerHasBouncer && (isMyTurn || yevaFlash);
@@ -2475,7 +2520,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
 
   // ---- GENERIC HIGH PRIORITY TUTOR WHEN NOTHING ELSE ----
   if (results.filter(r => r.priority >= 7).length === 0) {
-    const tutors = hand.filter(c => CARDS[c]?.tags?.includes("tutor") && CARDS[c]?.cmc <= mana);
+    const tutors = hand.filter(c => CARDS[c]?.tags?.includes("tutor") && (CARDS[c]?.cmc <= mana || infiniteManaActive));
     if (tutors.length > 0) {
       const tutor = tutors[0];
       const targets = getPriorityTargets(battlefield, hand);
@@ -2518,21 +2563,21 @@ function getTutorOptions(target, hand, battlefield, mana) {
   const inHand = new Set(hand);
 
   if (CARDS[target]?.type === "creature" || CARDS[target]?.type === "land") {
-    if (inHand.has("Worldly Tutor") && mana >= 1 && CARDS[target]?.type === "creature") options.push("Worldly Tutor");
+    if (inHand.has("Worldly Tutor") && (mana >= 1 || infiniteManaActive) && CARDS[target]?.type === "creature") options.push("Worldly Tutor");
     if (inHand.has("Summoner's Pact") && CARDS[target]?.type === "creature") options.push("Summoner's Pact");
-    if (inHand.has("Archdruid's Charm") && CARDS[target]?.type === "creature" && mana >= 3) options.push("Archdruid's Charm (mode 2: find creature)");
+    if (inHand.has("Archdruid's Charm") && CARDS[target]?.type === "creature" && (mana >= 3 || infiniteManaActive)) options.push("Archdruid's Charm (mode 2: find creature)");
     if (inHand.has("Chord of Calling")) {
       const targetCmc = CARDS[target]?.cmc ?? 2;
       const chordCost = Math.max(0, targetCmc + 3 - (battlefield?.length ?? 0));
-      if (mana >= chordCost) options.push(`Chord of Calling (convoke — tap ${Math.min(targetCmc + 3, battlefield?.length ?? 0)} creatures)`);
+      if (mana >= chordCost || infiniteManaActive) options.push(`Chord of Calling (convoke — tap ${Math.min(targetCmc + 3, battlefield?.length ?? 0)} creatures)`);
     }
-    if (inHand.has("Green Sun's Zenith") && mana >= 1) options.push("Green Sun's Zenith");
-    if (board.has("Survival of the Fittest") && mana >= 1 && hand.some(c => CARDS[c]?.type === "creature")) options.push("Survival of the Fittest");
-    if (inHand.has("Crop Rotation") && CARDS[target]?.type === "land" && mana >= 1) options.push("Crop Rotation");
+    if (inHand.has("Green Sun's Zenith") && (mana >= 1 || infiniteManaActive)) options.push("Green Sun's Zenith");
+    if (board.has("Survival of the Fittest") && (mana >= 1 || infiniteManaActive) && hand.some(c => CARDS[c]?.type === "creature")) options.push("Survival of the Fittest");
+    if (inHand.has("Crop Rotation") && CARDS[target]?.type === "land" && (mana >= 1 || infiniteManaActive)) options.push("Crop Rotation");
     if ((board.has("Elvish Reclaimer") || inHand.has("Elvish Reclaimer")) && CARDS[target]?.type === "land") options.push("Elvish Reclaimer");
-    if (inHand.has("Sylvan Scrying") && CARDS[target]?.type === "land" && mana >= 2) options.push("Sylvan Scrying");
-    if (inHand.has("Archdruid's Charm") && CARDS[target]?.type === "land" && mana >= 3) options.push("Archdruid's Charm");
-    if (inHand.has("Natural Order") && mana >= 4) options.push("Natural Order");
+    if (inHand.has("Sylvan Scrying") && CARDS[target]?.type === "land" && (mana >= 2 || infiniteManaActive)) options.push("Sylvan Scrying");
+    if (inHand.has("Archdruid's Charm") && CARDS[target]?.type === "land" && (mana >= 3 || infiniteManaActive)) options.push("Archdruid's Charm");
+    if (inHand.has("Natural Order") && (mana >= 4 || infiniteManaActive)) options.push("Natural Order");
   }
   return options;
 }
@@ -2879,6 +2924,24 @@ export default function YevaAdvisor() {
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [advice, setAdvice] = useState([]);
   const [showDebug, setShowDebug] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [jsonCopied, setJsonCopied] = useState(false);
+
+  // Load state from ?s= URL param on first mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const encoded = params.get("s");
+    if (!encoded) return;
+    decompressState(encoded).then(state => {
+      if (state.hand)        setHand(state.hand);
+      if (state.battlefield) setBattlefield(state.battlefield);
+      if (state.graveyard)   setGraveyard(state.graveyard);
+      if (state.mana != null) setMana(String(state.mana));
+      if (state.isMyTurn != null) setIsMyTurn(state.isMyTurn);
+      // Clean the URL without reloading
+      window.history.replaceState({}, "", window.location.pathname);
+    }).catch(() => {}); // silently ignore malformed params
+  }, []);
   // Each card is unique — adding to one zone removes it from the other two
   const addTo = (zone) => (card) => {
     if (zone !== "hand")        setHand(prev        => prev.filter(c => c !== card));
@@ -3018,11 +3081,30 @@ export default function YevaAdvisor() {
                         advice: advice.map(a => ({ priority: a.priority, category: a.category, headline: a.headline })),
                       };
                       navigator.clipboard.writeText(JSON.stringify(dump, null, 2));
+                      setJsonCopied(true);
+                      setTimeout(() => setJsonCopied(false), 2000);
                     }} style={{
                       background: "#1a3a1a", border: `1px solid ${COLORS.border}`,
                       borderRadius: "5px", padding: "4px 10px",
-                      color: COLORS.textMid, cursor: "pointer", fontSize: "11px",
-                    }}>📋 Copy JSON</button>
+                      color: jsonCopied ? "#5dade2" : COLORS.textMid,
+                      cursor: "pointer", fontSize: "11px",
+                      transition: "color 0.2s",
+                    }}>{jsonCopied ? "✓ Copied!" : "📋 Copy JSON"}</button>
+                    <button onClick={() => {
+                      const state = { hand, battlefield, graveyard, mana: Number(mana), isMyTurn };
+                      compressState(state).then(encoded => {
+                        const url = `${window.location.origin}${window.location.pathname}?s=${encoded}`;
+                        navigator.clipboard.writeText(url);
+                        setLinkCopied(true);
+                        setTimeout(() => setLinkCopied(false), 2000);
+                      });
+                    }} style={{
+                      background: "#1a2a3a", border: `1px solid ${COLORS.border}`,
+                      borderRadius: "5px", padding: "4px 10px",
+                      color: linkCopied ? "#5dade2" : COLORS.textMid,
+                      cursor: "pointer", fontSize: "11px",
+                      transition: "color 0.2s",
+                    }}>{linkCopied ? "✓ Copied!" : "🔗 Copy Link"}</button>
                     <button onClick={() => setShowDebug(false)} style={{
                       background: "none", border: `1px solid ${COLORS.border}`,
                       borderRadius: "5px", padding: "4px 10px",
@@ -3113,7 +3195,6 @@ export default function YevaAdvisor() {
                 marginBottom: "10px",
               }}>GAME STATE</div>
               <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
-                <label style={{ fontFamily: "'Cinzel', serif", fontSize: "11px", color: COLORS.textDim, letterSpacing: "1px" }}>TURN</label>
                 {["My Turn", "Opponent's Turn"].map(label => {
                   const isMine = label === "My Turn";
                   const active = isMyTurn === isMine;
