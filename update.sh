@@ -1,5 +1,5 @@
 
-cp ~/Downloads/yeva-advisor.jsx src/App.jsx
+#cp ~/Downloads/yeva-advisor.jsx src/App.jsx
 
 npm version patch   # 1.0.0 → 1.0.1
 #npm version minor   # 1.0.0 → 1.1.0
