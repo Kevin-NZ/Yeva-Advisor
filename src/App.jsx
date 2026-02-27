@@ -101,7 +101,7 @@ const CARDS = {
   "Badgermole Cub":        { type:"creature", cmc:2, tags:["combo","mana-doubler"] , devotion:1, role:"haste-combo", note:"Animates a land and gives it haste. All dorks produce 1 extra mana. Goes infinite with Ashaya+Quirion (mana-positive) or Scryb (mana-neutral). Pairs with Cradle/Nykthos."},
   "Woodcaller Automaton":  { type:"creature", cmc:8, tags:["combo","untap-land"] , devotion:2},
   "Sowing Mycospawn":      { type:"creature", cmc:5, tags:["removal","land-tutor"] , devotion:1},
-  "Formidable Speaker":    { type:"creature", cmc:2, tags:["combo","tutor","untap"] , devotion:1},
+  "Formidable Speaker":    { type:"creature", cmc:2, tags:["combo","tutor","untap","elf"] , devotion:1},
   "Chomping Changeling":   { type:"creature", cmc:3, tags:["elf","changeling"] , devotion:1},
   "Delighted Halfling":    { type:"creature", cmc:2, tags:["dork","protection"] , devotion:1, role:"protection", note:"Legendary creatures cost {1} less and can't be countered when cast. Protects Ashaya, Yeva, Yisan — key against blue interaction."},
   "Elvish Reclaimer":      { type:"creature", cmc:1, tags:["land-tutor","elf","1drop"] , devotion:1},
@@ -727,6 +727,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
 
   // Badgermole Cub substitutes for Destiny Spinner (land animation) when a bouncer is available
   const hasBouncer       = board.has("Temur Sabertooth") || board.has("Kogla, the Titan Ape") || inHand.has("Temur Sabertooth") || inHand.has("Kogla, the Titan Ape");
+  const speakerHasBouncer = board.has("Temur Sabertooth") || board.has("Kogla, the Titan Ape");
   // Badgermole Cub needs Temur Sabertooth specifically — Kogla only bounces Humans, not Badgers
   const badgermoleActive = (board.has("Badgermole Cub") || inHand.has("Badgermole Cub")) && (board.has("Temur Sabertooth") || inHand.has("Temur Sabertooth"));
   const hasLandAnimate   = board.has("Destiny Spinner") || inHand.has("Destiny Spinner") || badgermoleActive;
@@ -894,7 +895,8 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   // ---- YEVA FLASH TIMING ADVICE ----
   if (!isMyTurn && board.has("Yeva, Nature's Herald")) {
     // Check for flash-in combos
-    if (inHand.has("Ashaya, Soul of the Wild") && (inHand.has("Quirion Ranger") || board.has("Quirion Ranger"))) {
+    if (inHand.has("Ashaya, Soul of the Wild") && (inHand.has("Quirion Ranger") || board.has("Quirion Ranger"))
+        && (board.has("Duskwatch Recruiter") || inHand.has("Duskwatch Recruiter"))) {
       results.push({
         priority: 15,
         category: "⚡ INSTANT SPEED WIN",
@@ -1363,16 +1365,13 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
 
   // ---- ELVISH HARBINGER ----
   if ((inHand.has("Elvish Harbinger") || board.has("Elvish Harbinger")) && isMyTurn) {
-    // Harbinger finds any elf, but key insight: Formidable Speaker IS an elf-changeling via
-    // Chomping Changeling... actually Formidable Speaker is not an elf. But Harbinger can find
-    // Elvish Archdruid, Circle of Dreams Druid, Priest of Titania, Allosaurus Shepherd, etc.
-    // And it can find Elvish Harbinger itself for a loop.
     const harbingerTargets = [
       { name: "Elvish Archdruid",       reason: "big dork — taps for elves on board; also pumps all elves" },
       { name: "Priest of Titania",      reason: "big dork — taps for elves on board" },
       { name: "Circle of Dreams Druid", reason: "taps for creatures on board — Gaea's Cradle on a body" },
       { name: "Allosaurus Shepherd",    reason: "protection — elves and green spells can't be countered" },
       { name: "Fauna Shaman",           reason: "repeatable tutor — finds any creature including non-elves" },
+      { name: "Formidable Speaker",     reason: "tutor engine — find any creature on your end step with a bouncer" },
       { name: "Quirion Ranger",         reason: "infinite mana loop with Ashaya" },
       { name: "Wirewood Symbiote",      reason: "untap engine — bounces elf to untap any creature" },
       { name: "Elvish Reclaimer",       reason: "land tutor for Cradle, Sanitarium, Nykthos" },
@@ -1429,8 +1428,6 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       });
     }
   }
-
-  // ---- SURVIVAL OF THE FITTEST — richer advice ----
 
 
   // ---- TALON GATES OF MADARA ----
@@ -1959,7 +1956,6 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     && (hasCreatureToDiscard || infiniteManaActive);
   // Formidable Speaker: ETB looks at top X cards (X = creatures), puts a creature into hand.
   // Repeatable with Temur Sabertooth or Kogla bounce. No discard cost.
-  const speakerHasBouncer = board.has("Temur Sabertooth") || board.has("Kogla, the Titan Ape");
   const speakerCanActivate = board.has("Formidable Speaker") && speakerHasBouncer;
   const activatedCreatureTutors = [
     ...(faunaCanActivate    ? ["Fauna Shaman"]              : []),
@@ -3425,3 +3421,5 @@ export default function YevaAdvisor() {
     </>
   );
 }
+
+
