@@ -23,6 +23,7 @@ const CARDS = {
   "Circle of Dreams Druid":{ type:"creature", cmc:3, tags:["dork","elf","big-dork","infinite-dork"], tapsFor:"creatures" , devotion:2},
   "Karametra's Acolyte":   { type:"creature", cmc:4, tags:["dork","big-dork","infinite-dork"], tapsFor:"devotion" , devotion:1},
   "Fanatic of Rhonas":     { type:"creature", cmc:4, tags:["dork","elf","big-dork"], tapsFor:4 , devotion:1, role:"big-dork-combo", note:"Tap for 4 mana as a creature. Goes infinite with Ashaya+Quirion Ranger (needs ≥2 mana net) or Ashaya+Scryb Ranger (needs ≥3)."},
+  "Hope Tender":           { type:"creature", cmc:2, tags:["dork","elf","human","untap-lands","exert"], tapsFor:1 , devotion:1, role:"untap-combo", note:"Taps for {G}. Exert ({T}, exert): untap target land. Human subtype — Kogla returns it to hand on attack, resetting the exert for a fresh activation each loop. With Yavimaya, can untap Cradle/Nykthos for massive mana."},
   // COMBO PIECES
   "Ashaya, Soul of the Wild": { type:"creature", cmc:5, tags:["combo","key","ashaya"], tapsFor:0 , devotion:2},
   "Temur Sabertooth":      { type:"creature", cmc:4, tags:["combo","sabertooth","bounce","protection"] , devotion:2},
@@ -65,6 +66,7 @@ const CARDS = {
   "Lotus Petal":           { type:"artifact", cmc:0, tags:["rock","fast-mana"] , devotion:0},
   "Utopia Sprawl":         { type:"enchantment", cmc:1, tags:["enchant-land","ramp","aura"] , devotion:1},
   "Wild Growth":           { type:"enchantment", cmc:1, tags:["enchant-land","ramp","aura"] , devotion:1},
+  "Elvish Guidance":       { type:"enchantment", cmc:3, tags:["enchant-land","ramp","aura","elf-synergy"], devotion:1, role:"elf-mana", note:"Enchant Forest. Enchanted Forest taps for {G} per elf you control — a Priest of Titania on a land. Pairs devastatingly with Arbor Elf (untap it) and Wirewood Lodge. With 5+ elves taps for more than Gaea's Cradle in most mid-game boards."},
   // STAX / INTERACTION
   "Collector Ouphe":       { type:"creature", cmc:2, tags:["stax","hate"] , devotion:1},
   "Destiny Spinner":       { type:"creature", cmc:2, tags:["protection","stax"] , devotion:1, role:"haste-protection", note:"Animates lands as creatures with haste. Protects creatures AND enchantments from counters. Key pile piece — gives Reclaimer/Elder haste to tap immediately."},
@@ -551,6 +553,27 @@ const COMBOS = [
     ]
   },
 
+  // ── WIN CON: Badgermole Cub + Ashaya + Infinite Mana (Infinite Counters) ─
+  {
+    id: "badgermole_ashaya_counters",
+    name: "Badgermole Cub + Ashaya + Infinite Mana (Infinite +1/+1 Counters)",
+    onBattlefield: ["Badgermole Cub", "Ashaya, Soul of the Wild"],
+    description: "Win condition. With infinite mana and Ashaya in play, all your creatures are Forests (lands). Badgermole Cub's {1}{G} ability animates any land and puts a +1/+1 counter on it. Target your own creature-Forests repeatedly to stack infinite counters. All creatures become arbitrarily large — swing for lethal.",
+    requires: ["Badgermole Cub", "Ashaya, Soul of the Wild"],
+    needsInfiniteMana: true,
+    priority: 11,
+    type: "win-combat",
+    lines: [
+      "Infinite mana established. Badgermole Cub + Ashaya on battlefield.",
+      "All your nontoken creatures are Forests (lands) via Ashaya.",
+      "Pay {1}{G}: activate Badgermole Cub targeting any creature-Forest you control.",
+      "That creature gets a +1/+1 counter. It already was a creature — it just gets bigger.",
+      "Repeat infinitely. Each creature you target grows without limit.",
+      "With your entire board at +∞/+∞, attack for lethal across all opponents.",
+      "TIP: Spread counters across multiple creatures so a single removal doesn't stop the win.",
+    ]
+  },
+
   // ── WIN CON: Glademuse Draw on Opponent's Turn ────────────────────────
   {
     id: "glademuse_draw",
@@ -621,6 +644,123 @@ const COMBOS = [
       "Cast Eternal Witness ({2}{G}): ETB returns creature X from graveyard.",
       "Activate Survival again: discard creature X, search for any creature in library.",
       "Cast the tutored creature. Repeat to assemble your winning board state.",
+    ]
+  },
+
+  // ── Hope Tender + Kogla + Big Land (Infinite Mana) ────────────────────
+  {
+    id: "hope_tender_kogla",
+    name: "Hope Tender + Kogla + Big Land (≥4 mana)",
+    onBattlefield: ["Hope Tender", "Kogla, the Titan Ape"],
+    mustPreExist: ["Hope Tender", "Kogla, the Titan Ape"],
+    description: "Infinite mana. Tap Hope Tender for {G}, exert it to untap a big land (Gaea's Cradle or Nykthos producing ≥4). Pay {2} to activate Kogla, returning Hope Tender (a Human) to hand — fully resetting the exert. Recast Hope Tender for {1}{G}. Each loop nets mana equal to land output minus 3.",
+    requires: ["Hope Tender", "Kogla, the Titan Ape"],
+    needsAlso: ["Gaea's Cradle", "Nykthos, Shrine to Nyx", "Itlimoc, Cradle of the Sun"],
+    priority: 10,
+    type: "infinite-mana",
+    lines: [
+      "Hope Tender and Kogla, the Titan Ape on battlefield. Big land (Cradle/Nykthos/Itlimoc) producing ≥4 mana.",
+      "Tap Hope Tender for {G}.",
+      "Exert Hope Tender: untap the big land.",
+      "Tap big land for {N} mana (≥4).",
+      "Pay {2}: activate Kogla, return Hope Tender (a Human) to hand — exert is fully reset.",
+      "Recast Hope Tender for {1}{G}. Net: (land output − 3) mana per loop.",
+      "Repeat for infinite green mana.",
+    ]
+  },
+
+  // ── Hope Tender + Wirewood Lodge + Land (≥3 mana) ─────────────────────
+  {
+    id: "hope_tender_lodge",
+    name: "Hope Tender + Wirewood Lodge + Land (≥3 mana)",
+    onBattlefield: ["Hope Tender", "Wirewood Lodge"],
+    mustPreExist: ["Hope Tender", "Wirewood Lodge"],
+    description: "Infinite mana. Tap Hope Tender for {G} and exert it to untap a land producing ≥3. Spend {G} activating Wirewood Lodge to untap Hope Tender (an Elf) — this bypasses the exert restriction since Lodge forcibly untaps it. Net: (land output − 2) mana per loop. Infinite when land produces ≥3.",
+    requires: ["Hope Tender", "Wirewood Lodge"],
+    needsAlso: ["Gaea's Cradle", "Nykthos, Shrine to Nyx", "Itlimoc, Cradle of the Sun"],
+    needsAuraLand: true,
+    needsAuraLand3: true,
+    priority: 10,
+    type: "infinite-mana",
+    lines: [
+      "Hope Tender + Wirewood Lodge + a land producing ≥3 mana on battlefield.",
+      "Eligible lands: Gaea's Cradle, Nykthos, Itlimoc, or a Forest enchanted with Utopia Sprawl/Wild Growth.",
+      "Tap Hope Tender for {G}, then exert: untap the big land.",
+      "Tap big land for ≥3 mana.",
+      "Spend {G}: activate Wirewood Lodge, untapping Hope Tender (an Elf).",
+      "Lodge's untap bypasses the exert — Hope Tender can tap and exert again immediately.",
+      "Net: (land output − 2) mana per loop. Repeat for infinite mana.",
+    ]
+  },
+
+  // ── Elvish Guidance + Arbor Elf + Wirewood Lodge (≥2 elves) ───────────
+  {
+    id: "elvish_guidance_arbor_lodge",
+    name: "Elvish Guidance + Arbor Elf + Wirewood Lodge (≥2 elves)",
+    onBattlefield: ["Elvish Guidance", "Arbor Elf", "Wirewood Lodge"],
+    mustPreExist: ["Arbor Elf", "Wirewood Lodge"],
+    description: "Infinite mana with 2+ elves. Elvish Guidance enchants a Forest making it tap for {G} per elf. Arbor Elf untaps that Forest (free). Wirewood Lodge ({G}) untaps Arbor Elf. Net: (elf count − 1) mana per loop. Infinite when you have ≥2 elves (most boards have far more).",
+    requires: ["Elvish Guidance", "Arbor Elf", "Wirewood Lodge"],
+    needsMinElves: 2,
+    priority: 9,
+    type: "infinite-mana",
+    lines: [
+      "Elvish Guidance enchanting a Forest. Arbor Elf + Wirewood Lodge on battlefield. ≥2 elves in play.",
+      "Tap the Guidance-enchanted Forest for {G} × (elf count).",
+      "Activate Arbor Elf: untap the enchanted Forest (free).",
+      "Tap enchanted Forest again for {G} × (elf count) — second activation.",
+      "Spend {G}: activate Wirewood Lodge, untapping Arbor Elf.",
+      "Net: (elf count − 1) mana per full loop. With 3+ elves nets 2+. Repeat for infinite mana.",
+    ]
+  },
+
+  // ── Big Elf Dork + Wirewood Lodge (≥2 elves / creatures) ──────────────
+  // Covers: Priest of Titania, Elvish Archdruid, Circle of Dreams Druid
+  // All tap for N (elves or creatures), Lodge untaps for {G}. Net: N−1 per loop.
+  {
+    id: "big_dork_lodge",
+    name: "Big Elf Dork + Wirewood Lodge (≥2 elves/creatures)",
+    onBattlefield: ["Wirewood Lodge"],
+    mustPreExist: ["Wirewood Lodge"],
+    description: "Infinite mana. Priest of Titania, Elvish Archdruid, or Circle of Dreams Druid taps for N mana (elf/creature count). Wirewood Lodge pays {G} to untap the dork (all three are elves). Net N−1 per loop. Infinite when N ≥ 2, which is almost always true once the dork itself is in play.",
+    requires: ["Wirewood Lodge"],
+    needsBigElfDorkOnBoard: 2,
+    priority: 9,
+    type: "infinite-mana",
+    lines: [
+      "Priest of Titania, Elvish Archdruid, or Circle of Dreams Druid on battlefield with ≥2 elves/creatures.",
+      "Wirewood Lodge on battlefield.",
+      "Tap the big dork for N mana (N ≥ 2).",
+      "Spend {G}: activate Wirewood Lodge to untap the big dork (it's an elf).",
+      "Net: N − 1 mana per loop. Repeat for infinite green mana.",
+      "Circle of Dreams Druid counts all creatures, not just elves — counts itself too.",
+    ]
+  },
+
+  // ── Magus of the Candelabra + Wirewood Symbiote + Big Land ───────────
+  // NOTE: Magus is NOT an elf — Wirewood Lodge cannot untap it.
+  // Wirewood Symbiote bounces any elf to untap any creature (including Magus).
+  {
+    id: "magus_symbiote",
+    name: "Magus of the Candelabra + Wirewood Symbiote + Big Land (≥3 mana)",
+    onBattlefield: ["Magus of the Candelabra", "Wirewood Symbiote"],
+    mustPreExist: ["Magus of the Candelabra", "Wirewood Symbiote"],
+    description: "Infinite mana. Tap big land for N (≥3). Pay {1} to Magus (X=1) to untap the big land. Wirewood Symbiote bounces a 1-drop elf to untap Magus. Recast the 1-drop for {G}. Net: N − 2 mana per loop. Infinite when big land produces ≥3.",
+    requires: ["Magus of the Candelabra", "Wirewood Symbiote"],
+    needsAlso: ["Gaea's Cradle", "Nykthos, Shrine to Nyx", "Itlimoc, Cradle of the Sun"],
+    needsAuraLand: true,
+    needsAuraLand3: true,
+    needsOneDrop: true,
+    priority: 9,
+    type: "infinite-mana",
+    lines: [
+      "Magus of the Candelabra + Wirewood Symbiote + a 1-drop elf + big land (≥3 mana) on battlefield.",
+      "Tap big land for N mana (≥3).",
+      "Pay {1}: activate Magus with X=1, untapping 1 land (the big land).",
+      "Tap big land again for N mana.",
+      "Activate Wirewood Symbiote: bounce the 1-drop elf to hand → untap Magus (any creature).",
+      "Recast the 1-drop elf for {G}.",
+      "Net: N − 2 mana per loop. Gaea's Cradle grows as elves accumulate. Repeat for infinite mana.",
     ]
   },
 ];
@@ -732,11 +872,11 @@ const SECRET_CARDS = {
 // ============================================================
 const CATEGORIES = {
   "1-Drop Dorks": ["Llanowar Elves","Elvish Mystic","Fyndhorn Elves","Boreal Druid","Birds of Paradise","Arbor Elf","Quirion Ranger","Wirewood Symbiote","Elvish Reclaimer","Elvish Spirit Guide","Magus of the Candelabra","Allosaurus Shepherd"],
-  "2-3 Drop Creatures": ["Scryb Ranger","Priest of Titania","Earthcraft","Elvish Archdruid","Circle of Dreams Druid","Duskwatch Recruiter","Heartwood Storyteller","Hyrax Tower Scout","Eternal Witness","Fauna Shaman","Formidable Speaker","Destiny Spinner","Collector Ouphe","Glademuse","Delighted Halfling","Badgermole Cub","Chomping Changeling","Yisan, the Wanderer Bard","Elvish Harbinger","Fierce Empath","Tireless Provisioner","Nature's Rhythm","Endurance"],
+  "2-3 Drop Creatures": ["Scryb Ranger","Priest of Titania","Earthcraft","Elvish Archdruid","Circle of Dreams Druid","Duskwatch Recruiter","Heartwood Storyteller","Hyrax Tower Scout","Eternal Witness","Fauna Shaman","Formidable Speaker","Destiny Spinner","Collector Ouphe","Glademuse","Delighted Halfling","Badgermole Cub","Chomping Changeling","Yisan, the Wanderer Bard","Elvish Harbinger","Fierce Empath","Tireless Provisioner","Nature's Rhythm","Endurance","Hope Tender"],
   "4-5 Drop Creatures": ["Ashaya, Soul of the Wild","Temur Sabertooth","Karametra's Acolyte","Fanatic of Rhonas","Argothian Elder","Seedborn Muse","Eladamri, Korvecdal","Growing Rites of Itlimoc","Beast Whisperer","Yeva, Nature's Herald"],
   "6+ Drop Creatures": ["Kogla, the Titan Ape","Disciple of Freyalise","Woodland Bellower","Regal Force","Woodcaller Automaton","Sowing Mycospawn"],
   "Rocks & Artifacts": ["Sol Ring","Chrome Mox","Mox Diamond","Lotus Petal"],
-  "Enchantments": ["Utopia Sprawl","Wild Growth","Survival of the Fittest"],
+  "Enchantments": ["Utopia Sprawl","Wild Growth","Survival of the Fittest","Elvish Guidance"],
   "Instants & Sorceries": ["Worldly Tutor","Chord of Calling","Summoner's Pact","Shared Summons","Green Sun's Zenith","Natural Order","Eldritch Evolution","Crop Rotation","Sylvan Scrying","Archdruid's Charm","Beast Within","Force of Vigor","Infectious Bite","Legolas's Quick Reflexes"],
   "Key Lands": ["Gaea's Cradle","Itlimoc, Cradle of the Sun","Nykthos, Shrine to Nyx","Yavimaya, Cradle of Growth","Wirewood Lodge","Deserted Temple","Geier Reach Sanitarium","Ancient Tomb","Emergence Zone","Boseiju, Who Endures","Shifting Woodland","Talon Gates of Madara","War Room","Urza's Cave","Dryad Arbor","Misty Rainforest","Verdant Catacombs","Windswept Heath","Wooded Foothills"],
   "Basic Lands": ["Forest"],
@@ -822,6 +962,13 @@ function calculateBattlefieldMana(battlefield) {
   ).length;
   total += auraCount; // each aura enchants a Forest and adds +1 mana
 
+  // Elvish Guidance: enchanted Forest taps for {G} per elf. We already counted the Forest
+  // as 1, so add (elves - 1) extra. With Arbor Elf untapping it this doubles again
+  // but that's handled by Arbor Elf's arbor tapsFor logic.
+  if (board.has("Elvish Guidance")) {
+    total += Math.max(0, elves - 1); // the Forest already gave 1; Guidance adds (elves-1) more
+  }
+
   return total;
 }
 
@@ -847,15 +994,15 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   const yevaFlash        = board.has("Yeva, Nature's Herald");
 
   // Compute infiniteManaActive early so all subsequent checks can use it safely
-  const infiniteManaActive = (() => {
+  const { infiniteManaActive, activeComboName } = (() => {
     for (const combo of COMBOS) {
       if (combo.type !== "infinite-mana") continue;
       const allOnBoard = combo.requires.every(r => board.has(r));
       if (!allOnBoard) continue;
       const extras = comboExtrasSatisfied(combo);
-      if (extras.ok) return true;
+      if (extras.ok) return { infiniteManaActive: true, activeComboName: combo.name };
     }
-    return false;
+    return { infiniteManaActive: false, activeComboName: null };
   })();
 
   // Can we cast permanents into play this turn? (our turn, Yeva flash, or infinite mana)
@@ -931,12 +1078,39 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       if (!hasEngine) return { ok: false, missing: "Beast Whisperer or Glademuse (draw engine)" };
     }
 
-    // needsAuraLand: Argothian+Lodge combo also works with an enchanted Forest
+    // needsMinElves: need at least N elves on the battlefield
+    if (combo.needsMinElves) {
+      const elfCount = battlefield.filter(c => CARDS[c]?.tags?.includes("elf")).length;
+      if (elfCount < combo.needsMinElves) {
+        return { ok: false, missing: `at least ${combo.needsMinElves} elves on battlefield (have ${elfCount})` };
+      }
+    }
+
+    // needsBigElfDorkOnBoard: like needsBigDork but restricted to battlefield only
+    // and requires the dork to be an elf (so Wirewood Lodge can untap it)
+    if (combo.needsBigElfDorkOnBoard) {
+      const threshold = combo.needsBigElfDorkOnBoard;
+      const dork = battlefield.find(c => {
+        if (!CARDS[c]?.tags?.includes("elf")) return false;
+        if (!CARDS[c]?.tags?.includes("dork") && !CARDS[c]?.tags?.includes("big-dork")) return false;
+        return estimateDorkOutput(c) >= threshold;
+      });
+      if (!dork) return { ok: false, missing: `a big elf dork on battlefield producing ≥${threshold} mana (Priest of Titania, Elvish Archdruid, or Circle of Dreams Druid with ${threshold}+ elves/creatures)` };
+    }
+
+    // needsAuraLand: combo also works with an enchanted Forest (producing ≥2)
+    // For Hope Tender + Lodge we need ≥3 mana — double aura counts, single doesn't
     if (combo.needsAlso) {
       const hasNamedLand = combo.needsAlso.some(c => board.has(c) || inHand.has(c));
-      const hasAuraLand = combo.needsAuraLand && (
-        (board.has("Utopia Sprawl") || board.has("Wild Growth")) &&
-        (board.has("Forest") || board.has("Dryad Arbor") || board.has("Yavimaya, Cradle of Growth"))
+      const auraCount = (board.has("Utopia Sprawl") ? 1 : 0) + (board.has("Wild Growth") ? 1 : 0)
+        + (board.has("Elvish Guidance") ? 1 : 0); // Guidance can also boost output
+      const hasForest = board.has("Forest") || board.has("Dryad Arbor") || board.has("Yavimaya, Cradle of Growth");
+      // Standard aura land: needs ≥1 aura for most combos (produces 2+)
+      // needsAuraLand3: needs to produce ≥3, so requires 2 auras OR Guidance with ≥3 elves
+      const hasAuraLand = combo.needsAuraLand && hasForest && (
+        combo.needsAuraLand3
+          ? (auraCount >= 2 || (board.has("Elvish Guidance") && battlefield.filter(c => CARDS[c]?.tags?.includes("elf")).length >= 3))
+          : auraCount >= 1
       );
       if (!hasNamedLand && !hasAuraLand) {
         return { ok: false, missing: combo.needsAlso.join(" or ") + (combo.needsAuraLand ? " (or a Forest enchanted with Utopia Sprawl/Wild Growth)" : "") };
@@ -1077,20 +1251,70 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   }
 
   // ---- ARBOR ELF + AURA SYNERGY ----
-  if (board.has("Arbor Elf") && (inHand.has("Utopia Sprawl") || inHand.has("Wild Growth")) && (mana >= 1 || infiniteManaActive)) {
-    const aura = inHand.has("Utopia Sprawl") ? "Utopia Sprawl" : "Wild Growth";
+  if (board.has("Arbor Elf") && (inHand.has("Utopia Sprawl") || inHand.has("Wild Growth") || inHand.has("Elvish Guidance")) && (mana >= 1 || infiniteManaActive)) {
+    const aura = inHand.has("Elvish Guidance") ? "Elvish Guidance"
+      : inHand.has("Utopia Sprawl") ? "Utopia Sprawl" : "Wild Growth";
+    const guidanceOutput = aura === "Elvish Guidance" ? elvesOnBoard + 1 : 2; // +1 for the elf we'll have
     results.push({
       priority: 9,
       category: "🌱 RAMP",
-      headline: `Enchant Forest with ${aura} → Arbor Elf = 3 mana`,
-      detail: `${aura} on a Forest + Arbor Elf untapping it = 3 mana from a single Forest. This is the fastest ramp pattern in the deck — equivalent to a turn-1 accelerant.`,
+      headline: aura === "Elvish Guidance"
+        ? `Elvish Guidance on Forest → Arbor Elf = ${guidanceOutput * 2} mana (${elvesOnBoard + 1} elves)`
+        : `Enchant Forest with ${aura} → Arbor Elf = 3 mana`,
+      detail: aura === "Elvish Guidance"
+        ? `Elvish Guidance makes a Forest tap for {G} per elf. With ${elvesOnBoard + 1} elves, the Forest taps for ${guidanceOutput}. Arbor Elf untaps it for a second activation — ${guidanceOutput * 2} mana total from one Forest.`
+        : `${aura} on a Forest + Arbor Elf untapping it = 3 mana from a single Forest. This is the fastest ramp pattern in the deck.`,
       steps: [
-        `Cast ${aura} on a Forest (choose green).`,
-        "Arbor Elf untaps that Forest: now taps for {G}{G}.",
-        "Plus normal land drop = 3 mana total. This enables turn-2 three-drops."
+        aura === "Elvish Guidance"
+          ? `Cast Elvish Guidance on a Forest.`
+          : `Cast ${aura} on a Forest (choose green).`,
+        aura === "Elvish Guidance"
+          ? `Forest now taps for ${guidanceOutput} {G} (${elvesOnBoard + 1} elves).`
+          : "Forest now taps for {G}{G}.",
+        "Activate Arbor Elf: untap that Forest.",
+        aura === "Elvish Guidance"
+          ? `Tap Forest again for another ${guidanceOutput} {G} — ${guidanceOutput * 2} mana total this activation window.`
+          : "Tap Forest again — 3 mana total.",
+        "Each new elf you cast increases output by {G}.",
       ],
       color: "#52be80",
     });
+  }
+
+  // ---- HOPE TENDER + BIG LAND ----
+  if (inHand.has("Hope Tender") && (mana >= 2 || infiniteManaActive)) {
+    const hasYavimaya = board.has("Yavimaya, Cradle of Growth");
+    const hasBigLand  = board.has("Gaea's Cradle") || board.has("Nykthos, Shrine to Nyx");
+    const hasKogla    = board.has("Kogla, the Titan Ape");
+    const hasUntapper = hasKogla || board.has("Wirewood Lodge") || board.has("Quirion Ranger") || board.has("Scryb Ranger");
+    if (hasBigLand || hasYavimaya || hasUntapper) {
+      const target = board.has("Gaea's Cradle") ? "Gaea's Cradle"
+        : board.has("Nykthos, Shrine to Nyx") ? "Nykthos, Shrine to Nyx"
+        : "a key land";
+      results.push({
+        priority: hasBigLand ? 8 : 6,
+        category: "🌱 RAMP",
+        headline: hasKogla
+          ? `Cast Hope Tender — Kogla resets exert for repeatable ${target} untap`
+          : `Cast Hope Tender — exert to untap ${target}`,
+        detail: hasKogla
+          ? `Hope Tender is a Human — Kogla returns it to hand on attack, completely resetting the exert. Cast, tap, exert to untap ${target}, then Kogla bounces it back. Repeatable every turn, or freely with infinite mana.`
+          : `Hope Tender taps for {G} and can exert to untap any land. With ${target} in play, untapping it effectively doubles your mana output.`,
+        steps: [
+          `Cast Hope Tender ({1}{G}).`,
+          `Tap Hope Tender for {G}, then exert: untap ${target}.`,
+          `Tap ${target} for big mana.`,
+          ...(hasKogla ? [
+            "Kogla attacks: return Hope Tender (Human) to hand — exert fully resets.",
+            "Recast and repeat next turn (or immediately with infinite mana).",
+          ] : hasUntapper ? [
+            board.has("Wirewood Lodge") ? "Wirewood Lodge ({G}): untap Hope Tender to reset exert." :
+            "Quirion Ranger: return itself to hand to untap Hope Tender — resets exert.",
+          ] : ["Add Kogla (best), Wirewood Lodge, or Quirion Ranger to reset the exert each turn."]),
+        ],
+        color: "#52be80",
+      });
+    }
   }
 
   // ---- EARTHCRAFT + DORKS ----
@@ -1257,6 +1481,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { name: "Dryad Arbor",          xCost: 0, reason: "free land onto battlefield (ramp + elf count + combo piece)" },
       { name: "Allosaurus Shepherd",   xCost: 1, reason: "elves uncounterable — protection against blue" },
       { name: "Duskwatch Recruiter",   xCost: 2, reason: "win con with infinite mana" },
+      { name: "Hope Tender",           xCost: 2, reason: "exert untaps Cradle or Nykthos — double your biggest land's output" },
       { name: "Destiny Spinner",       xCost: 2, reason: "haste + uncounterable for creatures and enchantments" },
       { name: "Fauna Shaman",          xCost: 2, reason: "repeatable creature tutor" },
       { name: "Quirion Ranger",        xCost: 1, reason: "infinite mana loop piece with Ashaya" },
@@ -1276,6 +1501,55 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
           `${best.reason.charAt(0).toUpperCase() + best.reason.slice(1)}.`,
           ...(gsTargets.length > 1 ? [`Other options: ${gsTargets.slice(1,3).map(t => `X=${t.xCost} → ${t.name}`).join(", ")}.`] : []),
           "Zenith shuffles back into library — retrievable via Eternal Witness for repeat use.",
+        ],
+        color: "#5dade2",
+      });
+    }
+  }
+
+  // ---- CHORD OF CALLING ----
+  // Instant-speed creature tutor. Convoke reduces cost by tapping creatures.
+  // Key: can be cast on opponent's end step at instant speed — huge with Yeva flash.
+  if (inHand.has("Chord of Calling")) {
+    const convokeTap   = Math.min(creaturesOnBoard, 7); // tap up to 7 creatures for convoke
+    const remainder    = Math.max(0, 7 - convokeTap);   // remaining mana needed for X=5 (Ashaya)
+    const effectiveMana = mana + convokeTap;             // mana + convoke = effective casting power
+
+    // Build ranked target list based on what's castable and what's missing
+    const chordTargets = [
+      { name: "Duskwatch Recruiter",      xCost: 2, reason: "win condition — activate with infinite mana to pull library" },
+      { name: "Quirion Ranger",           xCost: 1, reason: "infinite mana loop piece with Ashaya" },
+      { name: "Hope Tender",              xCost: 2, reason: "exert untaps a key land like Cradle or Nykthos for double mana" },
+      { name: "Wirewood Symbiote",        xCost: 1, reason: "untap engine — bounces an elf to untap any creature" },
+      { name: "Elvish Reclaimer",         xCost: 1, reason: "tutors Cradle, Sanitarium, or Nykthos" },
+      { name: "Destiny Spinner",          xCost: 2, reason: "gives haste to creature-lands + makes your spells uncounterable" },
+      { name: "Eternal Witness",          xCost: 3, reason: "retrieves any card from graveyard" },
+      { name: "Temur Sabertooth",         xCost: 4, reason: "bounce engine for infinite ETB loops" },
+      { name: "Ashaya, Soul of the Wild", xCost: 5, reason: "all creatures become Forests — unlocks all infinite mana combos" },
+      { name: "Hyrax Tower Scout",        xCost: 3, reason: "untaps a land on ETB — combo piece with Temur Sabertooth" },
+      { name: "Seedborn Muse",            xCost: 5, reason: "untaps all permanents each opponent's turn — game-changing engine" },
+      { name: "Kogla, the Titan Ape",     xCost: 6, reason: "bouncer + removal, returns humans on attack" },
+    ].filter(t => !board.has(t.name) && effectiveMana >= t.xCost + 1);
+
+    if (chordTargets.length > 0) {
+      const best = chordTargets[0];
+      const convokeCost = Math.min(convokeTap, best.xCost + 1);
+      const payMana     = Math.max(0, best.xCost + 1 - convokeTap);
+      const canFlash    = !isMyTurn; // Chord is instant — most powerful at flash timing
+
+      results.push({
+        priority: canFlash && board.has("Ashaya, Soul of the Wild") ? 9 : 8,
+        category: canFlash ? "⚡ CHORD — INSTANT SPEED" : "🎯 CHORD OF CALLING",
+        headline: `Chord of Calling (X=${best.xCost}) → ${best.name}${canFlash ? " — cast NOW at instant speed" : ""}`,
+        detail: `Chord of Calling finds ${best.name} and puts it directly onto the battlefield. Convoke lets you tap creatures to reduce the cost — tap ${convokeCost} creature${convokeCost !== 1 ? "s" : ""} to pay {${convokeCost}} of the cost.${canFlash ? " Chord is an instant — cast this on an opponent's end step while they're tapped out." : ""}`,
+        steps: [
+          `Cast Chord of Calling with X=${best.xCost}: tap ${convokeCost} creature${convokeCost !== 1 ? "s" : ""} (convoke) + pay {${payMana}} mana.`,
+          `${best.name} enters the battlefield — ${best.reason}.`,
+          ...(canFlash ? [
+            "INSTANT SPEED TIP: Cast on the end step of the opponent to your right — they've already taken their turn and the next player hasn't untapped yet.",
+            board.has("Ashaya, Soul of the Wild") ? "With Ashaya in play, the creature enters as a Forest immediately — combo pieces can start untapping right away." : "",
+          ].filter(Boolean) : []),
+          ...(chordTargets.length > 1 ? [`Other strong targets: ${chordTargets.slice(1, 3).map(t => `X=${t.xCost} ${t.name}`).join(", ")}.`] : []),
         ],
         color: "#5dade2",
       });
@@ -1309,6 +1583,60 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         color: "#5dade2",
       });
     }
+  }
+
+  // ---- SUMMONER'S PACT ----
+  // Summoner's Pact is free to cast but creates a mandatory upkeep trigger:
+  // "At the beginning of your next upkeep, pay {2}{G}{G}. If you don't, you lose."
+  // This is a common mistake — forgetting to pay costs games.
+  if (inHand.has("Summoner's Pact")) {
+    const pactTargets = [
+      { name: "Duskwatch Recruiter",      reason: "win condition with infinite mana — highest priority" },
+      { name: "Quirion Ranger",           reason: "infinite mana loop piece with Ashaya" },
+      { name: "Ashaya, Soul of the Wild", reason: "unlocks all infinite mana combos" },
+      { name: "Eternal Witness",          reason: "retrieves key piece from graveyard" },
+      { name: "Temur Sabertooth",         reason: "bounce engine for infinite ETB loops" },
+      { name: "Hope Tender",              reason: "exert untaps big land, Kogla resets exert" },
+      { name: "Destiny Spinner",          reason: "haste + uncounterable protection" },
+      { name: "Wirewood Symbiote",        reason: "untap engine" },
+    ].filter(t => !board.has(t.name));
+
+    const best = pactTargets[0];
+    results.push({
+      priority: 7,
+      category: "⚡ SUMMONER'S PACT — FREE",
+      headline: best
+        ? `Summoner's Pact (free) → ${best.name} — ⚠️ pay {2}{G}{G} next upkeep`
+        : "Summoner's Pact available — ⚠️ pay {2}{G}{G} next upkeep or lose",
+      detail: `Summoner's Pact costs {0} to cast but creates a mandatory delayed trigger: at the beginning of your NEXT upkeep you must pay {2}{G}{G} or you lose the game immediately. Cast it now ${best ? `to find ${best.name}` : "for the best available target"}, but only if you can pay 4 mana next turn.`,
+      steps: [
+        "⚠️ BEFORE casting: confirm you will have {2}{G}{G} (4 mana) available on your next upkeep.",
+        `Cast Summoner's Pact ({0}): find ${best ? best.name : "target green creature"} → put into hand.`,
+        ...(best ? [`${best.name}: ${best.reason}.`] : []),
+        "MANDATORY: On your next upkeep, pay {2}{G}{G} immediately or you lose the game.",
+        "TIP: If you will win this turn or next turn before your upkeep, the trigger is irrelevant.",
+        ...(pactTargets.length > 1 ? [`Other targets: ${pactTargets.slice(1, 3).map(t => t.name).join(", ")}.`] : []),
+      ],
+      color: "#e74c3c",
+    });
+  }
+
+  // ---- SUMMONER'S PACT UPKEEP REMINDER ----
+  // Pact goes to the graveyard after resolving. If it's there on our turn,
+  // the delayed trigger is live — pay {2}{G}{G} or lose.
+  if (isMyTurn && inGrave.has("Summoner's Pact")) {
+    results.push({
+      priority: 14,
+      category: "⚠️ PACT UPKEEP — PAY NOW",
+      headline: "Summoner's Pact in graveyard — pay {2}{G}{G} this upkeep or lose",
+      detail: "Summoner's Pact was cast last turn. Its delayed trigger is on the stack at the start of your upkeep: pay {2}{G}{G} immediately or you lose the game. Do this before any other actions.",
+      steps: [
+        "PAY {2}{G}{G} right now — this is mandatory, not optional.",
+        "Only skip payment if you will win before your upkeep resolves (e.g. you have a kill on the stack).",
+        "Move Pact to exile or hand after paying to clear this reminder.",
+      ],
+      color: "#e74c3c",
+    });
   }
 
   // ---- SYLVAN SCRYING ----
@@ -1611,6 +1939,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       2: [
         { name: "Duskwatch Recruiter",    reason: "win condition — find this first if infinite mana is close" },
         { name: "Priest of Titania",      reason: "big dork tapping for elf count — often 3-6+ mana" },
+        { name: "Hope Tender",            reason: "exert untaps Cradle or Nykthos — doubles your biggest land output" },
         { name: "Destiny Spinner",        reason: "haste enabler + land animation for combo sequencing" },
         { name: "Wirewood Symbiote",      reason: "untap engine if not yet in play" },
         { name: "Earthcraft",             reason: "tap creatures to untap basics — enables fast loops" },
@@ -1884,6 +2213,88 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
           ...(board.has("Ashaya, Soul of the Wild") && (board.has("Quirion Ranger") || board.has("Scryb Ranger"))
             ? ["Ashaya + Quirion/Scryb Ranger + Arbor Elf loop = INFINITE MANA."]
             : ["Add Ashaya + Quirion Ranger to convert this into an infinite mana loop."]),
+        ],
+        color: "#27ae60",
+      });
+    }
+  }
+
+  // ---- HOPE TENDER ----
+  if (board.has("Hope Tender")) {
+    const hasYavimaya  = board.has("Yavimaya, Cradle of Growth");
+    const hasAshaya    = board.has("Ashaya, Soul of the Wild");
+    const hasBigLand   = board.has("Gaea's Cradle") || board.has("Nykthos, Shrine to Nyx");
+    const hasKogla     = board.has("Kogla, the Titan Ape");
+    const hasUntapper  = hasKogla || board.has("Wirewood Lodge") || board.has("Quirion Ranger") || board.has("Scryb Ranger") || board.has("Wirewood Symbiote");
+    const hasExertSynergy = hasYavimaya && hasBigLand;
+
+    if (hasExertSynergy || hasUntapper) {
+      const exertTarget = board.has("Gaea's Cradle") ? "Gaea's Cradle"
+        : board.has("Nykthos, Shrine to Nyx") ? "Nykthos, Shrine to Nyx"
+        : "a key land";
+
+      const resetMethod = hasKogla
+        ? "Kogla attacks → returns Hope Tender (Human) to hand → recast → exert resets"
+        : board.has("Wirewood Lodge") ? "Wirewood Lodge ({G}): untap Hope Tender, resetting the exert"
+        : board.has("Quirion Ranger") ? "Quirion Ranger: return itself to hand to untap Hope Tender"
+        : "Wirewood Symbiote: bounce an elf to untap Hope Tender";
+
+      results.push({
+        priority: hasExertSynergy ? 8 : 6,
+        category: "🌿 HOPE TENDER",
+        headline: hasKogla
+          ? `Hope Tender + Kogla loop: exert → untap ${exertTarget} every turn`
+          : `Hope Tender: exert to untap ${exertTarget} for double mana`,
+        detail: hasKogla
+          ? `Kogla attacks and returns Hope Tender (a Human) to hand — this resets the exert completely. Recast Hope Tender, tap for {G}, exert to untap ${exertTarget} again. With infinite mana this loops freely every turn.`
+          : hasAshaya
+          ? "With Ashaya, Hope Tender is itself a Forest. Tap it for {G}, then exert to untap a big land. Use an untapper to reset the exert each loop."
+          : `Hope Tender's exert ability untaps ${exertTarget}. Pair with an untapper to reset it each turn.`,
+        steps: [
+          `Tap Hope Tender for {G}.`,
+          `Exert Hope Tender: untap ${exertTarget}.`,
+          `Tap ${exertTarget} for big mana.`,
+          ...(hasKogla ? [
+            "Kogla attacks: return Hope Tender (Human) to hand — exert is fully reset.",
+            "Recast Hope Tender ({1}{G}), tap for {G}, exert again next activation.",
+            "With infinite mana this loop repeats freely — double-tap a key land every iteration.",
+          ] : [
+            resetMethod + ".",
+            ...(hasAshaya ? ["With Ashaya, Hope Tender is a Forest — Wirewood Lodge can untap it directly as an elf."] : []),
+          ]),
+          ...(!hasKogla && !hasUntapper ? ["Find Kogla (best), Wirewood Lodge, or Quirion Ranger to reset Hope Tender's exert each turn."] : []),
+        ],
+        color: "#27ae60",
+      });
+    }
+  }
+
+  // ---- ELVISH GUIDANCE ----
+  if (board.has("Elvish Guidance")) {
+    const guidanceOutput = elvesOnBoard; // taps for {G} per elf
+    const hasArbor       = board.has("Arbor Elf");
+    const hasLodge       = board.has("Wirewood Lodge");
+    const hasYavimaya    = board.has("Yavimaya, Cradle of Growth");
+
+    if (guidanceOutput >= 2 || hasArbor) {
+      results.push({
+        priority: hasArbor ? 8 : 6,
+        category: "🌿 ELVISH GUIDANCE",
+        headline: hasArbor
+          ? `Elvish Guidance + Arbor Elf: double-tap enchanted Forest for ${guidanceOutput * 2} mana`
+          : `Elvish Guidance: enchanted Forest taps for ${guidanceOutput} mana (${elvesOnBoard} elves)`,
+        detail: `Elvish Guidance enchants a Forest, making it tap for {G} per elf you control. With ${elvesOnBoard} elf${elvesOnBoard !== 1 ? "s" : ""} in play it produces ${guidanceOutput} mana${hasArbor ? ` — Arbor Elf can untap it for a second activation, totalling ${guidanceOutput * 2} mana from one land` : ""}.`,
+        steps: [
+          `Tap Elvish Guidance-enchanted Forest for ${guidanceOutput} {G} (${elvesOnBoard} elves × {G}).`,
+          ...(hasArbor ? [
+            `Activate Arbor Elf: untap the enchanted Forest.`,
+            `Tap Forest again for another ${guidanceOutput} {G} — total ${guidanceOutput * 2} mana this turn.`,
+          ] : []),
+          ...(hasLodge ? [
+            `Wirewood Lodge: pay {G}, tap Lodge to untap Arbor Elf — enables a third activation.`,
+          ] : []),
+          ...(hasYavimaya ? ["Yavimaya makes ALL lands Forests — Arbor Elf can also untap Gaea's Cradle or Nykthos for even more value."] : []),
+          `Every new elf you cast increases the Forest's output by {G}.`,
         ],
         color: "#27ae60",
       });
@@ -2813,6 +3224,29 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     });
   }
 
+  // ---- BADGERMOLE CUB + ASHAYA WIN CON ----
+  // With infinite mana + Ashaya, Badgermole can put infinite +1/+1 counters
+  // on your creatures — all of which are Forests (valid land targets).
+  // Only fire this if the COMBOS loop hasn't already generated a win-combat card for this.
+  const badgermoleAlreadyFired = results.some(r => r.combo === "badgermole_ashaya_counters");
+  if (infiniteManaActive && board.has("Badgermole Cub") && board.has("Ashaya, Soul of the Wild") && !badgermoleAlreadyFired) {
+    const creatureTargets = battlefield.filter(c => CARDS[c]?.type === "creature").length;
+    results.push({
+      priority: 11,
+      category: "🔥 WIN NOW — COMBAT",
+      headline: `Badgermole Cub + Ashaya + ∞ mana: put infinite +1/+1 counters on ${creatureTargets} creature${creatureTargets !== 1 ? "s" : ""}`,
+      detail: "With Ashaya in play all your nontoken creatures are Forests (lands). Badgermole Cub's {1}{G} ability animates any land and puts a +1/+1 counter on it. With infinite mana, activate it infinite times targeting your creature-Forests — each creature grows without limit. Swing for lethal.",
+      steps: [
+        `Pay {1}{G}: activate Badgermole Cub, target any creature you control (it's a Forest via Ashaya).`,
+        "That creature gets a +1/+1 counter.",
+        "Repeat until all creatures are arbitrarily large.",
+        "Spread counters across multiple creatures — don't stack everything on one target.",
+        `Attack with your ${creatureTargets} creature${creatureTargets !== 1 ? "s" : ""} for lethal damage across all opponents.`,
+      ],
+      color: "#ff6b35",
+    });
+  }
+
   // ---- INFECTIOUS BITE POISON LINE ----
   {
     const biteInHand  = inHand.has("Infectious Bite");
@@ -2968,6 +3402,11 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         why: "activates to pull entire creature library → assemble win pile → Sanitarium mill",
       },
       {
+        name: "Badgermole Cub",
+        available: board.has("Badgermole Cub") && board.has("Ashaya, Soul of the Wild"),
+        why: "with Ashaya, pay {1}{G} repeatedly to put infinite +1/+1 counters on your creatures → swing for lethal",
+      },
+      {
         name: "Infectious Bite",
         available: inHand.has("Infectious Bite") || inGrave.has("Infectious Bite"),
         why: "with Eternal Witness + bouncer → 10 poison counters on all opponents",
@@ -3056,7 +3495,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
 
   // Sort by priority descending
   results.sort((a, b) => b.priority - a.priority);
-  return { results: results.slice(0, 5), infiniteManaActive };
+  return { results: results.slice(0, 7), infiniteManaActive, activeComboName };
 }
 
 function getTutorOptions(target, hand, battlefield, mana, infiniteMana = false) {
@@ -3829,6 +4268,7 @@ export default function YevaAdvisor() {
   const [yisanCounters, setYisanCounters] = useState(0);
   const [advice, setAdvice] = useState([]);
   const [infiniteMana, setInfiniteMana] = useState(false);
+  const [activeComboName, setActiveComboName] = useState(null);
   const [collapseKey, setCollapseKey] = useState(0);
   const advicePanelRef = useRef(null);
 
@@ -3869,9 +4309,21 @@ export default function YevaAdvisor() {
       if (type === "instant" || type === "sorcery") return;
     }
     const isBasic = CARDS[card]?.tags?.includes("basic");
-    if (zone !== "hand")        setHand(prev        => prev.filter(c => c !== card));
-    if (zone !== "battlefield") setBattlefield(prev => isBasic ? prev : prev.filter(c => c !== card));
-    if (zone !== "graveyard")   setGraveyard(prev   => isBasic ? prev : prev.filter(c => c !== card));
+    // Always remove the card from other zones (move semantics),
+    // but for basics only remove ONE instance (the first), not all.
+    if (zone !== "hand")        setHand(prev => {
+      const idx = prev.indexOf(card);
+      return idx === -1 ? prev : [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+    });
+    if (zone !== "battlefield") setBattlefield(prev => {
+      const idx = prev.indexOf(card);
+      return idx === -1 ? prev : [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+    });
+    if (zone !== "graveyard")   setGraveyard(prev => {
+      const idx = prev.indexOf(card);
+      return idx === -1 ? prev : [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+    });
+    // Add to destination — basics can have duplicates, others deduplicate
     const setter = zone === "hand" ? setHand : zone === "battlefield" ? setBattlefield : setGraveyard;
     setter(prev => (!isBasic && prev.includes(card)) ? prev : [...prev, card]);
   };
@@ -3880,7 +4332,7 @@ export default function YevaAdvisor() {
   const reset = () => {
     setHand([]); setBattlefield([]); setGraveyard([]);
     setMana("3"); setIsMyTurn(false); setAdvice([]);
-    setYisanCounters(0); setInfiniteMana(false);
+    setYisanCounters(0); setInfiniteMana(false); setActiveComboName(null);
   };
 
   // Auto-calculate mana from battlefield contents
@@ -3899,9 +4351,10 @@ export default function YevaAdvisor() {
   // Live analysis as state changes
   useEffect(() => {
     if (hand.length + battlefield.length > 0) {
-      const { results, infiniteManaActive } = analyzeGameState({ hand, battlefield, graveyard, manaAvailable: mana, isMyTurn, yisanCounters });
+      const { results, infiniteManaActive, activeComboName: comboName } = analyzeGameState({ hand, battlefield, graveyard, manaAvailable: mana, isMyTurn, yisanCounters });
       setAdvice(results);
       setInfiniteMana(infiniteManaActive);
+      setActiveComboName(comboName);
     }
   }, [hand, battlefield, graveyard, mana, isMyTurn, yisanCounters]);
 
@@ -3974,18 +4427,39 @@ export default function YevaAdvisor() {
               {creaturesOnBoard} creatures · {elvesOnBoard} elves · {devotionOnBoard}🌲 devotion
             </div>
             {infiniteMana && (
-              <div style={{
-                padding: "4px 12px",
-                background: "#1a0a2e",
-                border: `1px solid #a855f7`,
-                borderRadius: "6px",
-                fontSize: "12px", color: "#c084fc",
-                fontFamily: "'Cinzel', serif",
-                letterSpacing: "1px",
-                boxShadow: "0 0 10px #a855f722",
-                animation: "pulse 2s ease-in-out infinite",
-              }}>
+              <div
+                title={activeComboName ? `Active combo: ${activeComboName}` : "Infinite mana combo active"}
+                style={{
+                  padding: "4px 12px",
+                  background: "#1a0a2e",
+                  border: `1px solid #a855f7`,
+                  borderRadius: "6px",
+                  fontSize: "12px", color: "#c084fc",
+                  fontFamily: "'Cinzel', serif",
+                  letterSpacing: "1px",
+                  boxShadow: "0 0 10px #a855f722",
+                  animation: "pulse 2s ease-in-out infinite",
+                  cursor: "help",
+                  position: "relative",
+                }}>
                 ⚡ ∞ INFINITE MANA
+                {activeComboName && (
+                  <span style={{
+                    display: "block",
+                    fontSize: "9px",
+                    letterSpacing: "0.5px",
+                    color: "#a78bfa",
+                    marginTop: "1px",
+                    fontFamily: "'Crimson Text', serif",
+                    fontStyle: "italic",
+                    maxWidth: "180px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {activeComboName}
+                  </span>
+                )}
               </div>
             )}
             <button onClick={() => setShowDebug(true)} style={{
