@@ -1244,7 +1244,11 @@ function calculateBattlefieldMana(battlefield) {
   return total;
 }
 
-function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTurn, yisanCounters = 0, opponentThreats, lifeTotal }) {
+function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTurn, yisanCounters = 0, opponentThreats, lifeTotal, deckList = null }) {
+  // deckList: Set of card names in the player's deck. When set, ONE PIECE AWAY advice and
+  // combo suggestions are filtered to only show cards that are actually in the deck.
+  // null = no filter (all cards valid, legacy behaviour).
+  const inDeck = deckList ? (c) => deckList.has(c) : () => true;
   const board = new Set(battlefield);
   const inHand = new Set(hand);
   const inGrave = new Set(graveyard);
@@ -1301,6 +1305,9 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     }
   }
   const infiniteManaActive = _inf;
+  // Yeva is the commander — always castable from command zone for {2}{G}{G} (or more with tax).
+  // yevaAvailable = flash already active, OR infinite mana (tax irrelevant), OR ≥4 mana to cast her.
+  const yevaAvailable = yevaFlash || infiniteManaActive || mana >= 4;
   const activeComboName    = _infName;
 
   // Can we cast permanents into play this turn? (our turn, Yeva flash, or infinite mana)
@@ -1552,18 +1559,21 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
 
 
   // ---- YEVA FLASH TIMING ADVICE ----
-  if (!isMyTurn && board.has("Yeva, Nature's Herald")) {
+  // Fires when: Yeva on board (free flash), OR infinite mana active (cast from command zone free),
+  // OR ≥4 mana available (cast Yeva from command zone for {2}{G}{G}).
+  if (!isMyTurn && yevaAvailable) {
+    const yevaNote = yevaFlash ? "via Yeva (on board)" : "via Yeva (cast from command zone)";
     // Check for flash-in combos
     if (inHand.has("Ashaya, Soul of the Wild") && (inHand.has("Quirion Ranger") || board.has("Quirion Ranger"))
         && (board.has("Duskwatch Recruiter") || inHand.has("Duskwatch Recruiter"))) {
       results.push({
         priority: 15,
         category: "⚡ INSTANT SPEED WIN",
-        headline: "FLASH IN: Ashaya + Quirion Ranger NOW",
-        detail: "On opponent's end step, flash in Ashaya. Quirion Ranger (in hand or board) creates an infinite mana loop immediately. Opponents are tapped out and cannot respond.",
+        headline: `FLASH IN: Ashaya + Quirion Ranger NOW (${yevaNote})`,
+        detail: `On opponent's end step, flash in Ashaya ${yevaNote}. Quirion Ranger (in hand or board) creates an infinite mana loop immediately. Opponents are tapped out and cannot respond.`,
         steps: [
           "Wait for last opponent's end step (or when they commit to the stack).",
-          "Flash Ashaya via Yeva.",
+          yevaFlash ? "Flash Ashaya via Yeva." : "Cast Yeva from command zone, then flash in Ashaya.",
           "Quirion Ranger now loops infinitely with any dork on board → infinite mana.",
           "With infinite mana: activate Duskwatch Recruiter to pull every creature → attack for lethal."
         ],
@@ -1575,10 +1585,10 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       results.push({
         priority: 14,
         category: "⚡ INSTANT SPEED WIN",
-        headline: "FLASH IN: Glademuse now → Draw entire library",
+        headline: `FLASH IN: Glademuse now → Draw entire library (${yevaNote})`,
         detail: "Glademuse on opponent's turn with Ashaya + Quirion Ranger = draw your entire deck at instant speed.",
         steps: [
-          "Flash Glademuse via Yeva on opponent's turn.",
+          `Flash Glademuse ${yevaNote} on opponent's turn.`,
           "Cast Quirion Ranger → Glademuse triggers → draw a card.",
           "Ranger bounces itself (it's a Forest via Ashaya), untaps any dork.",
           "Recast Ranger → draw again. Infinite draws = entire library in hand.",
@@ -1598,7 +1608,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         headline: `Flash in ${dork} at end of opponent's turn`,
         detail: `${dork} bypasses summoning sickness when flashed in at EOT. Untap on your turn and it's ready to tap for mana immediately — enabling an infinite mana combo next turn.`,
         steps: [
-          `On last opponent's EOT, flash ${dork} via Yeva.`,
+          `On last opponent's EOT, flash ${dork} ${yevaNote}.`,
           "It untaps at the start of your turn — no summoning sickness.",
           "Next turn: pair with Temur Sabertooth + Hyrax Scout or Quirion Ranger loop for infinite mana."
         ],
@@ -1792,11 +1802,18 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
 
         // Determine which path is valid
         const duskwatchReady = board.has("Duskwatch Recruiter") || inHand.has("Duskwatch Recruiter");
-        // Path A: Speaker in library (always true if not on board), need a Forest in hand to discard
+        // Path A: Speaker in library (always true if not on board), need something to discard for ETB.
+        // The discard can come from: any card in hand (other than Natural Order itself),
+        // OR a Forest bounced from battlefield via Scryb/Quirion Ranger.
         const hasForestInHand = hand.some(c => c === "Forest" || (CARDS[c]?.type === "land" && c.toLowerCase().includes("forest")));
+        const hasOtherCardInHand = hand.some(c => c !== "Natural Order");
+        const hasBattlefieldForest = battlefield.some(c => c === "Forest" || CARDS[c]?.tags?.includes("basic"));
+        const scrybCanBounceForest = board.has("Scryb Ranger") && hasBattlefieldForest;
+        const quirionCanBounceForest = board.has("Quirion Ranger") && hasBattlefieldForest;
+        const hasDiscardForSpeaker = hasOtherCardInHand || scrybCanBounceForest || quirionCanBounceForest;
         const speakerNotOnBoard = !board.has("Formidable Speaker");
-        const pathA = speakerNotOnBoard && hasForestInHand; // NO → Speaker → ETB discard Forest → Ashaya → loop → bounce Speaker → ETB → Duskwatch
-        const pathB = duskwatchReady; // NO → Ashaya → loop → cast Duskwatch directly
+        const pathA = speakerNotOnBoard && hasDiscardForSpeaker;
+        const pathB = duskwatchReady;
 
         if (!pathA && !pathB) {
           // No clean win line — fall through to generic advice
@@ -1805,11 +1822,18 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
           if (pathA) {
             // Preferred: Natural Order → Speaker → ETB → Ashaya → infinite → bounce Speaker → Duskwatch
             const forestInHand = hand.find(c => c === "Forest" || (CARDS[c]?.type === "land" && c.toLowerCase().includes("forest")));
+            const otherCardInHand = hand.find(c => c !== "Natural Order");
+            const bounceRangerForForest = !hasOtherCardInHand && (scrybCanBounceForest || quirionCanBounceForest);
+            const bounceRanger = scrybCanBounceForest ? "Scryb Ranger" : "Quirion Ranger";
+            const discardSource = otherCardInHand || "Forest (bounced from battlefield)";
             headline = `Natural Order → Formidable Speaker → ETB finds Ashaya → ${rangerName} loop → bounce Speaker → find Duskwatch → WIN`;
-            detail = `Natural Order puts Formidable Speaker onto the battlefield. Speaker ETB: discard ${forestInHand} → search library for Ashaya, Soul of the Wild. Ashaya makes all creatures Forests — ${rangerName} bounces itself to untap ${bigDorkNO} (${loopDesc}). With infinite mana: ${rangerName} bounces Speaker back to hand, recast Speaker ({2}{G}), ETB again: discard any card → find Duskwatch Recruiter. Activate → WIN.`;
+            detail = `Natural Order puts Formidable Speaker onto the battlefield. Speaker ETB: discard ${discardSource} → search library for Ashaya, Soul of the Wild. Ashaya makes all creatures Forests — ${rangerName} bounces itself to untap ${bigDorkNO} (${loopDesc}). With infinite mana: ${rangerName} bounces Speaker back to hand, recast Speaker ({2}{G}), ETB again: discard any card → find Duskwatch Recruiter. Activate → WIN.`;
             steps = [
+              ...(bounceRangerForForest ? [
+                `Activate ${bounceRanger}: return a Forest from battlefield to hand — this gives you a card to discard for Speaker's ETB.`,
+              ] : []),
               `Cast Natural Order ({2}{G}{G}): sacrifice ${sacTarget !== bigDorkNO ? sacTarget : "any green creature"} → search library for Formidable Speaker, put it onto the battlefield.`,
-              `Formidable Speaker ETB: discard ${forestInHand} from hand → search library for Ashaya, Soul of the Wild. Put Ashaya into your hand, then shuffle.`,
+              `Formidable Speaker ETB: discard ${discardSource} from hand → search library for Ashaya, Soul of the Wild. Put Ashaya into your hand, then shuffle.`,
               `Cast Ashaya, Soul of the Wild. All your nontoken creatures are now Forest lands.`,
               `${rangerName} is now a Forest. Activate: return ${rangerName} to hand — untaps ${bigDorkNO}.`,
               `Tap ${bigDorkNO} for ${dorkOutput} mana. Recast ${rangerName} ({${rangerRecastCost === 1 ? "G" : "1}{G"}}). ${loopDesc}.`,
@@ -2887,6 +2911,85 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     }
   }
 
+  // ---- YAVIMAYA + GAEA'S CRADLE / BOSEIJU LAND BOUNCE ----
+  // Yavimaya makes all lands Forests. This unlocks two tactical plays:
+  // 1. Crop Rotation can fetch ANY Forest — including utility lands like Wirewood Lodge,
+  //    Geier Reach Sanitarium, or Deserted Temple (which can untap Cradle for a second tap).
+  //    NOTE: Crop Rotation cannot fetch Gaea's Cradle back after sacrificing it (it goes to
+  //    graveyard, not library). The correct line is to tap Cradle first, then Crop Rotation
+  //    a basic Forest to fetch a utility land.
+  // 2. Activate Boseiju to destroy any noncreature permanent (land/artifact/enchantment).
+  if (board.has("Yavimaya, Cradle of Growth") && isMyTurn) {
+    const hasCradle        = board.has("Gaea's Cradle");
+    const hasBoseiju       = board.has("Boseiju, Who Endures");
+    const hasDesTem        = board.has("Deserted Temple");
+    const hasCropRot       = inHand.has("Crop Rotation");
+    const hasReclaimer     = board.has("Elvish Reclaimer") || inHand.has("Elvish Reclaimer");
+    const hasWirewoodLodge = board.has("Wirewood Lodge");
+    const hasSanitarium    = board.has("Geier Reach Sanitarium");
+    const cradleTap        = creaturesOnBoard;
+
+    // Play 1a: Deserted Temple untaps Gaea's Cradle for a second tap (the real double-tap line)
+    if (hasCradle && hasDesTem && !board.has("Argothian Elder")) {
+      results.push({
+        priority: cradleTap >= 4 ? 10 : 7,
+        category: "🌿 MANA BOOST",
+        headline: `Deserted Temple: untap Gaea's Cradle for a second ${cradleTap}-mana tap`,
+        detail: `Tap Gaea's Cradle for ${cradleTap} mana, then activate Deserted Temple ({T}: untap target nonbasic land) to untap it for a second tap. Net: ${cradleTap * 2} mana from ${cradleTap * 2} gross (Temple taps itself so no mana cost). With ${creaturesOnBoard} creatures this generates ${cradleTap * 2} total green mana.`,
+        steps: [
+          `Tap Gaea's Cradle for ${cradleTap} mana.`,
+          `Activate Deserted Temple: tap Temple → untap Gaea's Cradle.`,
+          `Tap Gaea's Cradle again for ${cradleTap} more mana.`,
+          `Total: ${cradleTap * 2} mana this turn from Cradle alone.`,
+        ],
+        color: "#27ae60",
+      });
+    }
+
+    // Play 1b: Crop Rotation — sacrifice a basic Forest to fetch a utility land
+    // (NOT Cradle → Cradle; the sacrificed land goes to graveyard, not library)
+    if (hasCropRot) {
+      const hasBasicForest = battlefield.some(c => c === "Forest");
+      const fetchTargets = [
+        !hasDesTem && hasCradle ? "Deserted Temple (untap Cradle for second tap)" : null,
+        !hasSanitarium ? "Geier Reach Sanitarium (win condition)" : null,
+        !hasWirewoodLodge && elvesOnBoard >= 2 ? "Wirewood Lodge (untap a dork)" : null,
+        !board.has("Nykthos, Shrine to Nyx") ? "Nykthos, Shrine to Nyx (devotion mana)" : null,
+      ].filter(Boolean);
+
+      if (hasBasicForest && fetchTargets.length > 0) {
+        results.push({
+          priority: 7,
+          category: "🌿 MANA BOOST",
+          headline: `Yavimaya + Crop Rotation: sacrifice a Forest → fetch ${fetchTargets[0].split(" (")[0]}`,
+          detail: `Yavimaya makes all lands Forests, so Crop Rotation can fetch any land in your deck. Sacrifice a basic Forest (not Gaea's Cradle — it would go to the graveyard, not the library) to find a utility land. Best targets right now: ${fetchTargets.join("; ")}.`,
+          steps: [
+            hasCradle ? `Tap Gaea's Cradle for ${cradleTap} mana first.` : null,
+            `Cast Crop Rotation ({G}, instant): sacrifice a basic Forest → search library for ${fetchTargets[0].split(" (")[0]}, put it onto the battlefield.`,
+            fetchTargets[0].includes("Deserted Temple") ? `Activate Deserted Temple: untap Gaea's Cradle → tap Cradle again for ${cradleTap} mana.` : null,
+          ].filter(Boolean),
+          color: "#27ae60",
+        });
+      }
+    }
+
+    // Play 2: Boseiju — destroy any noncreature permanent (land/artifact/enchantment)
+    if (hasBoseiju && mana >= 1) {
+      results.push({
+        priority: 6,
+        category: "🌿 REMOVAL AVAILABLE",
+        headline: `Yavimaya + Boseiju: destroy any land, artifact, or enchantment (uncounterable)`,
+        detail: `Boseiju, Who Endures is a Forest via Yavimaya. Its channel ability ({G}, discard Boseiju): destroy target artifact, enchantment, or nonbasic land. Uncounterable. With Yavimaya in play, Boseiju can also be fetched by any Forest-search effect (Crop Rotation, Elvish Reclaimer, fetchlands).`,
+        steps: [
+          `Identify the threat: an artifact (Collector Ouphe, Torpor Orb), enchantment (Rest in Peace, Rhystic Study), or nonbasic land.`,
+          `Activate Boseiju's channel: pay {G}, discard Boseiju → destroy target artifact, enchantment, or nonbasic land. This ability can't be countered.`,
+          `Note: Boseiju can be fetched via Crop Rotation, Elvish Reclaimer, or fetchlands since Yavimaya makes it a Forest.`,
+        ],
+        color: "#e74c3c",
+      });
+    }
+  }
+
   // ---- HOPE TENDER ----
   if (board.has("Hope Tender")) {
     const hasYavimaya  = board.has("Yavimaya, Cradle of Growth");
@@ -3263,8 +3366,12 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       }
     } else if (missing.length === 1 && extras.ok) {
       // One named piece missing — always emit advice even without a tutor in hand.
+      // If a deckList is active, only show this if the missing card is actually in the deck.
       if (combo.type !== "infinite-mana" || !infiniteManaActive) {
         const missingCard = missing[0];
+        if (!inDeck(missingCard) || combo.requires.some(c => c !== missingCard && !inDeck(c))) {
+          // Missing card or another required card not in deck — skip
+        } else {
         const tutorOptions = getTutorOptions(missingCard, hand, battlefield, mana, infiniteManaActive);
         const speakerIsTutor = tutorOptions.length > 0 && tutorOptions[0].startsWith("Formidable Speaker");
         results.push({
@@ -3284,6 +3391,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
           combo: combo.id,
           color: speakerIsTutor ? "#e67e22" : "#58d68d",
         });
+        } // end inDeck check
       }
     } else if (missing.length === 0 && !extras.ok) {
       // Named pieces present but need an extra condition satisfied.
@@ -3294,7 +3402,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
           && (combo.type === "win-mill" || combo.type === "win-draw" || combo.type === "win-poison" || combo.type === "win-combat")
           && typeof extras.missing === "string"
           && extras.missing.toLowerCase().includes("endurance");
-        if (!suppressEndurance) {
+        if (!suppressEndurance && inDeck(extras.missing)) {
           const tutorOptions = getTutorOptions(extras.missing, hand, battlefield, mana, infiniteManaActive);
           results.push({
             priority: combo.priority,
@@ -3316,6 +3424,10 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       if (combo.type !== "infinite-mana" || !infiniteManaActive) {
         const ownedPieces = combo.requires.filter(r => board.has(r) || inHand.has(r));
         if (ownedPieces.length >= 1) {
+          // When a deckList is active, skip this combo entirely if ANY required card is not in the deck
+          if (combo.requires.some(c => !inDeck(c))) {
+            // At least one required card isn't in this deck — don't suggest this combo
+          } else {
           const missingNames = missing.slice(0, 3).join(", ");
           const tutorOptions = getTutorOptions(missing[0], hand, battlefield, mana, infiniteManaActive);
           results.push({
@@ -3329,6 +3441,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
             combo: combo.id,
             color: "#5d8a5d",
           });
+          } // end inDeck check
         }
       }
     }
@@ -3355,12 +3468,12 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
 
   // ---- DUSKWATCH RECRUITER (infinite mana → full win pile) ----
   // Can we access Duskwatch Recruiter right now?
-  // Direct: on board, in hand on our turn, or in hand with Yeva (flash)
+  // Direct: on board, in hand on our turn, or in hand with Yeva flash/available (commander zone)
   const duskwatchOnBoard  = board.has("Duskwatch Recruiter");
   const duskwatchInHand   = inHand.has("Duskwatch Recruiter");
   const duskwatchDirect   = duskwatchOnBoard
     || (duskwatchInHand && isMyTurn)
-    || (duskwatchInHand && yevaFlash);
+    || (duskwatchInHand && yevaAvailable);
 
   // Via tutor: a tutor that can find Duskwatch (a CMC-2 green creature) is castable now
   // Instant-speed tutors: castable any time (or with Yeva on board for flash window)
@@ -3404,7 +3517,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   // Woodland Bellower: ETB puts any non-legendary green creature CMC <= 3 directly onto battlefield.
   // Castable on our turn (sorcery speed) or with Yeva flash. Already-on-board means ETB already fired.
   const bellowerInHand    = inHand.has("Woodland Bellower");
-  const bellowerCastable  = bellowerInHand && (isMyTurn || yevaFlash);
+  const bellowerCastable  = bellowerInHand && (isMyTurn || yevaAvailable);
   // Bellower can find: Duskwatch, Eternal Witness, Endurance, Destiny Spinner, Elvish Reclaimer,
   // Fauna Shaman (discard to tutor), Formidable Speaker (discard → full library search), Hyrax Tower Scout, Quirion Ranger, Scryb Ranger,
   // Priest of Titania, Elvish Archdruid, Circle of Dreams Druid, Magus of the Candelabra, etc.
@@ -3435,7 +3548,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     if (speed === "instant")   return true;
     if (speed === "sorcery")   return isMyTurn;
     if (speed === "activated") return isMyTurn || yevaFlash;
-    if (speed === "bellower")  return isMyTurn || yevaFlash;
+    if (speed === "bellower")  return isMyTurn || yevaAvailable;
     return false;
   });
 
@@ -3465,8 +3578,12 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   const duskwatchAccessNote = duskwatchOnBoard                    ? ""
     : (duskwatchInHand && isMyTurn)                              ? "Cast Duskwatch → "
     : (duskwatchInHand && yevaFlash)                             ? "Flash Duskwatch (Yeva) → "
+    : (duskwatchInHand && yevaAvailable)                         ? "Cast Yeva → Flash Duskwatch → "
     : duskwatchViaTutor                                          ? `${tutorsThatFindDuskwatch[0].tutor} → Duskwatch → `
     : "";
+
+  // If Yeva needs to be cast from command zone first, prepend that as a step
+  const castYevaFirst = !isMyTurn && !yevaFlash && yevaAvailable;
 
   if (duskwatchCastable && (infiniteManaActive || mana >= 20)) {
     // Determine which Sanitarium untap method is available
@@ -3498,6 +3615,9 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         ? "With infinite mana, activate Duskwatch Recruiter repeatedly to pull the win pile from your library, then use Geier Reach Sanitarium to mill all opponents out."
         : "⚠️ Endurance is REQUIRED before activating Sanitarium — without it you will mill yourself out. Find Endurance via Duskwatch before starting the Sanitarium loop.",
       steps: [
+        ...(castYevaFirst ? [
+          `FIRST: Cast Yeva, Nature's Herald from command zone ({2}{G}{G}) — gives all green creatures flash for the rest of this turn.`,
+        ] : []),
         ...(duskwatchViaTutor && !duskwatchOnBoard ? [
           `ACCESS: Cast ${tutorNote(tutorsThatFindDuskwatch[0].tutor)} to find Duskwatch Recruiter.`
           + (tutorsThatFindDuskwatch.length > 1 ? ` (Alternatives: ${tutorsThatFindDuskwatch.slice(1).map(x=>x.tutor).join(", ")})` : ""),
@@ -3824,13 +3944,26 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         "Magus of the Candelabra":"enters play — {X}: untap X lands; key Ashaya/Nykthos combo piece",
       }[primaryTarget] || "enters play directly — no casting cost";
 
+      // Suppress the standalone WIN NOW if the WIN NOW — PILE entry already covers this exact
+      // line (Bellower is the tutor feeding duskwatchViaTutor → the PILE block fires at p15).
+      const pileAlreadyCoversThis = isWinNow
+        && primaryTarget === "Duskwatch Recruiter"
+        && results.some(r => r.priority >= 15 && r.category.includes("WIN NOW"));
+      if (pileAlreadyCoversThis) {
+        // Already represented at higher priority — skip to avoid duplicate
+      } else {
       results.push({
         priority: isWinNow ? 14 : (winTarget ? 10 : 8),
         category: isWinNow ? "🔥 WIN NOW" : "🌲 BELLOWER TUTOR",
-        headline: `Cast Woodland Bellower → put ${primaryTarget} onto battlefield`,
+        headline: castYevaFirst
+          ? `Cast Yeva → Flash Woodland Bellower → put ${primaryTarget} onto battlefield`
+          : `Cast Woodland Bellower → put ${primaryTarget} onto battlefield`,
         detail: `Woodland Bellower ETB: search for any non-legendary green creature with CMC ≤ 3 and put it directly onto the battlefield. ${targetReason}`,
         steps: [
-          `Cast Woodland Bellower ({4}{G}{G}).`,
+          ...(castYevaFirst ? [
+            `FIRST: Cast Yeva, Nature's Herald from command zone ({2}{G}{G}) — gives all green creatures flash for this turn.`,
+          ] : []),
+          `Cast Woodland Bellower ({4}{G}{G})${castYevaFirst ? " at instant speed via Yeva's flash" : ""}.`,
           `ETB: search library for ${primaryTarget} and put it onto the battlefield.`,
           targetReason,
           ...(bellowerKeyTargets.length > 1
@@ -3845,6 +3978,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         ],
         color: isWinNow ? "#ff6b35" : "#27ae60",
       });
+      } // end pileAlreadyCoversThis check
     }
   }
 
@@ -4415,6 +4549,9 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         ? `You have infinite mana. ${available[0].name} ${available[0].why}.`
         : `You have infinite mana but no win condition is currently reachable. Use your tutor chain to find one.`,
       steps: [
+        ...(castYevaFirst ? [
+          `FIRST: Cast Yeva, Nature's Herald from command zone ({2}{G}{G}) — gives all green creatures flash for this turn.`,
+        ] : []),
         ...(available.length > 0 ? available.map(w => `✅ ${w.name}: ${w.why}.`) : []),
         ...(missing.length > 0 && available.length === 0 ? [
           `Missing win conditions: ${missing.map(w => w.name).join(", ")}.`,
@@ -4680,11 +4817,14 @@ function CardPill({ name, onRemove, zone }) {
   );
 }
 
-function CardInput({ label, zone, cards, onAdd, onRemove, placeholder }) {
+function CardInput({ label, zone, cards, onAdd, onRemove, placeholder, deckCards }) {
   const [input, setInput] = useState("");
   const [suggs, setSuggs] = useState([]);
 
   const [secret, setSecret] = useState(null);
+
+  // Search pool: active deck cards when a deck is selected, otherwise all known cards
+  const searchPool = deckCards ?? ALL_CARD_NAMES;
 
   const handleChange = (v) => {
     setInput(v);
@@ -4699,7 +4839,7 @@ function CardInput({ label, zone, cards, onAdd, onRemove, placeholder }) {
         setSuggs([]);
       } else {
         setSecret(null);
-        setSuggs(ALL_CARD_NAMES.filter(n => {
+        setSuggs(searchPool.filter(n => {
           if (!n.toLowerCase().includes(v.toLowerCase())) return false;
           const isBasic = CARDS[n]?.tags?.includes("basic");
           if (!isBasic && cards.includes(n)) return false;
@@ -5275,7 +5415,274 @@ function QuickAdd({ zone, onAdd }) {
 // ============================================================
 // MAIN APP
 // ============================================================
+// ============================================================
+// DECK MANAGEMENT
+// ============================================================
+
+const PRESET_DECKS = [
+  {
+    id: "yeva-competitive",
+    name: "Yeva Competitive",
+    cards: [
+      "Allosaurus Shepherd","Ancient Tomb","Arbor Elf","Archdruid's Charm",
+      "Argothian Elder","Ashaya, Soul of the Wild","Badgermole Cub","Beast Whisperer",
+      "Beast Within","Birds of Paradise","Boreal Druid","Boseiju, Who Endures",
+      "Chomping Changeling","Chord of Calling","Chrome Mox","Circle of Dreams Druid",
+      "Collector Ouphe","Crop Rotation","Delighted Halfling","Deserted Temple",
+      "Destiny Spinner","Disciple of Freyalise","Dryad Arbor","Duskwatch Recruiter",
+      "Earthcraft","Eladamri, Korvecdal","Eldritch Evolution","Elvish Archdruid",
+      "Elvish Guidance","Elvish Harbinger","Elvish Mystic","Elvish Reclaimer",
+      "Elvish Spirit Guide","Emergence Zone","Endurance","Eternal Witness",
+      "Fanatic of Rhonas","Fauna Shaman","Fierce Empath","Force of Vigor",
+      "Forest","Forest","Forest","Forest","Forest","Forest","Forest","Forest","Forest","Forest",
+      "Formidable Speaker","Fyndhorn Elves","Gaea's Cradle","Geier Reach Sanitarium",
+      "Glademuse","Green Sun's Zenith","Growing Rites of Itlimoc","Heartwood Storyteller",
+      "Hope Tender","Hyrax Tower Scout","Karametra's Acolyte","Kogla, the Titan Ape",
+      "Legolas's Quick Reflexes","Llanowar Elves","Lotus Petal","Magus of the Candelabra",
+      "Misty Rainforest","Mox Diamond","Natural Order","Nature's Rhythm",
+      "Nykthos, Shrine to Nyx","Priest of Titania","Quirion Ranger","Regal Force",
+      "Scryb Ranger","Seedborn Muse","Shared Summons","Shifting Woodland",
+      "Sol Ring","Sowing Mycospawn","Summoner's Pact","Survival of the Fittest",
+      "Sylvan Scrying","Talon Gates of Madara","Temur Sabertooth",
+      "Urza's Cave","Utopia Sprawl","Verdant Catacombs","War Room","Wild Growth",
+      "Windswept Heath","Wirewood Lodge","Wirewood Symbiote","Woodcaller Automaton",
+      "Wooded Foothills","Woodland Bellower","Worldly Tutor",
+      "Yavimaya, Cradle of Growth","Yisan, the Wanderer Bard","Yeva, Nature's Herald",
+    ],
+  },
+  {
+    id: "yeva-cedh-jan2026",
+    name: "cEDH Jan 2026",
+    cards: [
+      "Allosaurus Shepherd","Ancient Tomb","Arbor Elf","Archdruid's Charm",
+      "Argothian Elder","Ashaya, Soul of the Wild","Badgermole Cub","Beast Whisperer",
+      "Beast Within","Birds of Paradise","Boreal Druid","Boseiju, Who Endures",
+      "Chomping Changeling","Chord of Calling","Chrome Mox","Circle of Dreams Druid",
+      "Collector Ouphe","Crop Rotation","Delighted Halfling","Deserted Temple",
+      "Destiny Spinner","Disciple of Freyalise","Dryad Arbor",
+      "Duskwatch Recruiter","Earthcraft","Eladamri, Korvecdal","Eldritch Evolution",
+      "Elvish Archdruid","Elvish Harbinger","Elvish Mystic","Elvish Reclaimer",
+      "Elvish Spirit Guide","Emergence Zone","Endurance","Eternal Witness",
+      "Fanatic of Rhonas","Fauna Shaman","Fierce Empath","Force of Vigor",
+      "Forest","Forest","Forest","Forest","Forest","Forest","Forest","Forest","Forest","Forest",
+      "Formidable Speaker","Fyndhorn Elves","Gaea's Cradle","Geier Reach Sanitarium",
+      "Glademuse","Green Sun's Zenith","Growing Rites of Itlimoc","Heartwood Storyteller",
+      "Hyrax Tower Scout","Infectious Bite","Karametra's Acolyte","Kogla, the Titan Ape",
+      "Legolas's Quick Reflexes","Llanowar Elves","Lotus Petal","Magus of the Candelabra",
+      "Misty Rainforest","Mox Diamond","Natural Order","Nature's Rhythm",
+      "Nykthos, Shrine to Nyx","Priest of Titania","Quirion Ranger","Regal Force",
+      "Scryb Ranger","Seedborn Muse","Shared Summons","Shifting Woodland",
+      "Sol Ring","Sowing Mycospawn","Summoner's Pact","Survival of the Fittest",
+      "Sylvan Scrying","Talon Gates of Madara","Temur Sabertooth","Tireless Provisioner",
+      "Urza's Cave","Utopia Sprawl","Verdant Catacombs","War Room","Wild Growth",
+      "Windswept Heath","Wirewood Lodge","Wirewood Symbiote","Woodcaller Automaton",
+      "Wooded Foothills","Woodland Bellower","Worldly Tutor",
+      "Yavimaya, Cradle of Growth","Yeva, Nature's Herald","Yisan, the Wanderer Bard",
+    ],
+  },
+];
+
+// Hook: load/save deck lists from artifact storage
+function useDeckStorage() {
+  const [decks, setDecks] = useState(null); // null = loading
+  const [activeDeckId, setActiveDeckId] = useState(null);
+
+  // Load on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await window.storage.get("yeva-decks");
+        const savedActive = await window.storage.get("yeva-active-deck").catch(() => null);
+        const loadedDecks = saved ? JSON.parse(saved.value) : PRESET_DECKS.map(d => ({ ...d }));
+        // Persist presets on first load so they survive future sessions
+        if (!saved) await window.storage.set("yeva-decks", JSON.stringify(loadedDecks)).catch(() => {});
+        setDecks(loadedDecks);
+        setActiveDeckId(savedActive?.value || null);
+      } catch {
+        setDecks(PRESET_DECKS.map(d => ({ ...d })));
+        setActiveDeckId(null);
+      }
+    })();
+  }, []);
+
+  const saveDecks = async (newDecks) => {
+    setDecks(newDecks);
+    try { await window.storage.set("yeva-decks", JSON.stringify(newDecks)); } catch {}
+  };
+
+  const saveActiveDeck = async (id) => {
+    setActiveDeckId(id);
+    try { await window.storage.set("yeva-active-deck", id ?? ""); } catch {}
+  };
+
+  return { decks, activeDeckId, saveDecks, saveActiveDeck };
+}
+
+// Parse a pasted decklist (handles common formats: "1 Card Name", "Card Name", quantity lines)
+function parseDecklist(text) {
+  const cards = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("//") || line.startsWith("#")) continue;
+    // Strip quantity prefix: "1x Card", "1 Card", "x1 Card", or bare "Card"
+    const match = line.match(/^(\d+)x?\s+(.+)$/) || line.match(/^x(\d+)\s+(.+)$/);
+    const name = match ? match[2].trim() : line;
+    const qty  = match ? parseInt(match[1]) : 1;
+    // Resolve aliases
+    const resolved = CARD_ALIASES[name.toLowerCase()] || name;
+    // Only include cards we know about (or keep unknown ones for custom lists)
+    for (let i = 0; i < Math.min(qty, 99); i++) cards.push(resolved);
+  }
+  return [...new Set(cards)]; // deduplicate (deck lists each card once)
+}
+
+function DeckManager({ decks, activeDeckId, onSaveDecks, onSetActive, onClose }) {
+  const [showImport, setShowImport]   = useState(false);
+  const [importText, setImportText]   = useState("");
+  const [importName, setImportName]   = useState("");
+  const [importError, setImportError] = useState("");
+  const [saveStatus, setSaveStatus]   = useState(""); // "" | "saving" | "saved" | "error"
+
+  const deleteDeck = (id) => {
+    onSaveDecks((decks || []).filter(d => d.id !== id));
+    if (activeDeckId === id) onSetActive(null);
+  };
+
+  const handleImport = async () => {
+    setImportError("");
+    const cards = parseDecklist(importText);
+    if (cards.length === 0) { setImportError("No recognisable cards found."); return; }
+    const name = importName.trim() || "Imported Deck";
+    const id = "deck-" + Date.now();
+    const newDecks = [...(decks || []), { id, name, cards }];
+    setSaveStatus("saving");
+    try {
+      await window.storage.set("yeva-decks", JSON.stringify(newDecks));
+      onSaveDecks(newDecks);
+      setSaveStatus("saved");
+      setImportText(""); setImportName("");
+      setTimeout(() => { setSaveStatus(""); setShowImport(false); }, 800);
+    } catch (e) {
+      setSaveStatus("error");
+      setImportError("Storage error — deck saved in memory only: " + (e?.message || e));
+      onSaveDecks(newDecks); // still add in-memory
+    }
+  };
+
+  const btnStyle = (active) => ({
+    padding: "5px 14px", borderRadius: "4px", cursor: "pointer",
+    fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
+    background: active ? "#1a3a1a" : "none",
+    border: `1px solid ${active ? COLORS.green1 : COLORS.border}`,
+    color: active ? COLORS.text : COLORS.textDim,
+  });
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "#000000cc",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 1000,
+    }} onClick={onClose}>
+      <div style={{
+        background: COLORS.bgCard, border: `1px solid ${COLORS.border}`,
+        borderRadius: "12px", padding: "24px", width: "500px", maxHeight: "80vh",
+        overflowY: "auto", boxShadow: "0 8px 40px #000a",
+      }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", marginBottom: "20px" }}>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: "15px", color: COLORS.gold, flex: 1, letterSpacing: "2px" }}>
+            📚 DECK MANAGER
+          </div>
+          {!showImport && (
+            <button onClick={() => setShowImport(true)} style={{ ...btnStyle(false), marginRight: "10px" }}>+ IMPORT</button>
+          )}
+          <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: "18px" }}>✕</button>
+        </div>
+
+        {/* IMPORT FORM */}
+        {showImport ? (
+          <div>
+            <div style={{ fontSize: "12px", color: COLORS.textDim, marginBottom: "12px" }}>
+              Paste a decklist from Moxfield, Archidekt, or any standard format (e.g. "1 Llanowar Elves").
+            </div>
+            <input
+              value={importName}
+              onChange={e => setImportName(e.target.value)}
+              placeholder="Deck name…"
+              style={{ width: "100%", background: "#07100788", border: `1px solid ${COLORS.border}`, borderRadius: "6px", padding: "8px 12px", color: COLORS.text, fontFamily: "'Crimson Text', serif", fontSize: "13px", outline: "none", marginBottom: "10px" }}
+            />
+            <textarea
+              value={importText}
+              onChange={e => setImportText(e.target.value)}
+              placeholder={"1 Llanowar Elves\n1 Quirion Ranger\n1 Ashaya, Soul of the Wild\n..."}
+              rows={10}
+              style={{ width: "100%", background: "#07100788", border: `1px solid ${COLORS.border}`, borderRadius: "6px", padding: "8px 12px", color: COLORS.text, fontFamily: "'Crimson Text', serif", fontSize: "12px", outline: "none", resize: "vertical", lineHeight: 1.6 }}
+            />
+            {importError && <div style={{ color: "#e74c3c", fontSize: "12px", marginTop: "6px" }}>{importError}</div>}
+            <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+              <button onClick={handleImport} style={{ ...btnStyle(true), padding: "8px 20px" }}>
+                {saveStatus === "saving" ? "SAVING…" : saveStatus === "saved" ? "✓ SAVED" : "IMPORT DECK"}
+              </button>
+              <button onClick={() => { setShowImport(false); setImportError(""); setSaveStatus(""); }} style={{ ...btnStyle(false), padding: "8px 16px" }}>CANCEL</button>
+            </div>
+          </div>
+        ) : (
+          /* DECK LIST */
+          <div>
+            <div style={{ fontSize: "12px", color: COLORS.textDim, marginBottom: "12px" }}>
+              Choose a deck to filter advice — only cards in the selected deck will appear in suggestions.
+            </div>
+
+            {/* No filter option */}
+            <div onClick={() => { onSetActive(null); onClose(); }} style={{
+              padding: "10px 14px", borderRadius: "6px", cursor: "pointer",
+              marginBottom: "8px",
+              background: activeDeckId === null ? "#1a3a1a" : "#0a150a",
+              border: `1px solid ${activeDeckId === null ? COLORS.green1 : COLORS.border}`,
+              display: "flex", alignItems: "center", gap: "10px",
+            }}>
+              <span style={{ fontSize: "16px" }}>🌿</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'Cinzel', serif", fontSize: "12px", color: activeDeckId === null ? COLORS.text : COLORS.textMid }}>No Filter</div>
+                <div style={{ fontSize: "11px", color: COLORS.textDim }}>All cards valid — full advice</div>
+              </div>
+              {activeDeckId === null && <span style={{ color: COLORS.green1 }}>✓</span>}
+            </div>
+
+            {(decks || []).map(deck => (
+              <div key={deck.id} style={{
+                padding: "10px 14px", borderRadius: "6px",
+                marginBottom: "8px",
+                background: activeDeckId === deck.id ? "#1a3a1a" : "#0a150a",
+                border: `1px solid ${activeDeckId === deck.id ? COLORS.green1 : COLORS.border}`,
+                display: "flex", alignItems: "center", gap: "10px",
+              }}>
+                <div onClick={() => { onSetActive(deck.id); onClose(); }} style={{ flex: 1, display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <span style={{ fontSize: "16px" }}>🃏</span>
+                  <div>
+                    <div style={{ fontFamily: "'Cinzel', serif", fontSize: "12px", color: activeDeckId === deck.id ? COLORS.text : COLORS.textMid }}>{deck.name}</div>
+                    <div style={{ fontSize: "11px", color: COLORS.textDim }}>{deck.cards.length} cards</div>
+                  </div>
+                  {activeDeckId === deck.id && <span style={{ color: COLORS.green1 }}>✓</span>}
+                </div>
+                <button onClick={() => deleteDeck(deck.id)} style={{ background: "none", border: `1px solid #5a1a1a`, borderRadius: "4px", padding: "3px 8px", color: "#e74c3c88", cursor: "pointer", fontSize: "11px" }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function YevaAdvisor() {
+  const { decks, activeDeckId, saveDecks, saveActiveDeck } = useDeckStorage();
+  const [showDeckManager, setShowDeckManager] = useState(false);
+
+  // Compute the active deck's card set for filtering
+  const activeDeck = decks?.find(d => d.id === activeDeckId) ?? null;
+  const deckList = activeDeck ? new Set(activeDeck.cards) : null;
   const [hand, setHand] = useState([]);
   const [battlefield, setBattlefield] = useState([]);
   const [graveyard, setGraveyard] = useState([]);
@@ -5373,7 +5780,7 @@ export default function YevaAdvisor() {
   useEffect(() => {
     if (hand.length + battlefield.length > 0) {
       try {
-        const { results, infiniteManaActive, activeComboName: comboName } = analyzeGameState({ hand, battlefield, graveyard, manaAvailable: mana, isMyTurn, yisanCounters });
+        const { results, infiniteManaActive, activeComboName: comboName } = analyzeGameState({ hand, battlefield, graveyard, manaAvailable: mana, isMyTurn, yisanCounters, deckList });
         setAdvice(results);
         setInfiniteMana(infiniteManaActive);
         setActiveComboName(comboName);
@@ -5498,6 +5905,18 @@ export default function YevaAdvisor() {
               onMouseEnter={e => { e.target.style.borderColor = "#5dade2"; e.target.style.color = "#5dade2"; }}
               onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
             >⌗ DEBUG</button>
+            {/* Deck selector */}
+            <button onClick={() => setShowDeckManager(true)} style={{
+              background: activeDeck ? "#1a3a1a" : "none",
+              border: `1px solid ${activeDeck ? COLORS.green1 : COLORS.border}`,
+              borderRadius: "6px", padding: "5px 14px",
+              color: activeDeck ? COLORS.text : COLORS.textDim, cursor: "pointer",
+              fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
+              transition: "all 0.2s", maxWidth: "160px",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              📚 {activeDeck ? activeDeck.name : "ALL CARDS"}
+            </button>
             <button onClick={reset} style={{
               background: "none", border: `1px solid ${COLORS.border}`,
               borderRadius: "6px", padding: "5px 14px",
@@ -5511,6 +5930,15 @@ export default function YevaAdvisor() {
           </div>
 
           {/* DEBUG MODAL */}
+          {showDeckManager && decks !== null && (
+            <DeckManager
+              decks={decks}
+              activeDeckId={activeDeckId}
+              onSaveDecks={saveDecks}
+              onSetActive={saveActiveDeck}
+              onClose={() => setShowDeckManager(false)}
+            />
+          )}
           {showDebug && (
             <div style={{
               position: "fixed", inset: 0, zIndex: 1000,
@@ -5720,19 +6148,22 @@ export default function YevaAdvisor() {
             <QuickAdd zone="hand" onAdd={addTo("hand")} />
             <CardInput label="Hand" zone="hand" cards={hand}
               onAdd={addTo("hand")} onRemove={removeFrom(setHand)}
-              placeholder="Cards in your hand…" />
+              placeholder="Cards in your hand…"
+              deckCards={activeDeck?.cards} />
 
             {/* Battlefield */}
             <QuickAdd zone="battlefield" onAdd={addTo("battlefield")} />
             <CardInput label="Battlefield" zone="battlefield" cards={battlefield}
               onAdd={addTo("battlefield")} onRemove={removeFrom(setBattlefield)}
-              placeholder="Permanents you control…" />
+              placeholder="Permanents you control…"
+              deckCards={activeDeck?.cards} />
 
             {/* Graveyard */}
             <QuickAdd zone="graveyard" onAdd={addTo("graveyard")} />
             <CardInput label="Graveyard" zone="graveyard" cards={graveyard}
               onAdd={addTo("graveyard")} onRemove={removeFrom(setGraveyard)}
-              placeholder="Cards in your graveyard…" />
+              placeholder="Cards in your graveyard…"
+              deckCards={activeDeck?.cards} />
 
             {/* Playfield visualiser */}
             <Playfield
@@ -5864,6 +6295,27 @@ export default function YevaAdvisor() {
               )
             ) : (
               <div>
+                {activeDeck && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "8px",
+                    marginBottom: "14px", padding: "7px 12px",
+                    background: "#0d200d", border: `1px solid ${COLORS.green1}44`,
+                    borderRadius: "6px",
+                  }}>
+                    <span style={{ fontSize: "13px" }}>📚</span>
+                    <span style={{ fontFamily: "'Cinzel', serif", fontSize: "11px", color: COLORS.green1, letterSpacing: "1px" }}>
+                      {activeDeck.name}
+                    </span>
+                    <span style={{ fontSize: "11px", color: COLORS.textDim }}>
+                      — advice filtered to {activeDeck.cards.length} cards
+                    </span>
+                    <button onClick={() => setShowDeckManager(true)} style={{
+                      marginLeft: "auto", background: "none", border: "none",
+                      color: COLORS.textDim, cursor: "pointer", fontSize: "11px",
+                      fontFamily: "'Cinzel', serif",
+                    }}>change</button>
+                  </div>
+                )}
                 <div style={{
                   display: "flex", alignItems: "center", gap: "12px",
                   marginBottom: "20px",
