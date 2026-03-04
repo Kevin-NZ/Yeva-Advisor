@@ -1913,7 +1913,22 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   const faunaFetchesWitnessForNO = faunaCanFetchWitness() && !board.has("Eternal Witness");
   const witnessAccessibleForNO = witnessInHandForNO || faunaFetchesWitnessForNO;
   const witnessManaCostNO = faunaFetchesWitnessForNO && !witnessInHandForNO ? 4 : 3; // Fauna(1) + Witness(3) vs Witness(3)
-  const minManaNO = witnessManaCostNO + 4 + 5; // Witness + Natural Order + Ashaya
+  // After Witness enters, tap any big dork for mana before casting Natural Order.
+  // Witness itself adds 1 to elf/creature count — so Priest taps for elvesOnBoard+1, etc.
+  // Calculate how much mana a dork can produce *after* Witness is on the battlefield.
+  const dorkManaAfterWitness = (() => {
+    for (const c of battlefield) {
+      if (!CARDS[c]) continue;
+      const t = CARDS[c].tapsFor;
+      if (typeof t === "number" && t >= 2) return t;
+      if (t === "elves")     return elvesOnBoard;          // Witness is NOT an elf
+      if (t === "creatures") return creaturesOnBoard + 1;  // +1 for Witness (any creature)
+      if (t === "devotion")  return devotionOnBoard + (CARDS[c]?.devotion ?? 0); // Witness devotion 1
+    }
+    return 0;
+  })();
+  // Net cost = Witness + Natural Order + Ashaya, minus any dork mana tapped after Witness resolves
+  const minManaNO = witnessManaCostNO + 4 + 5 - dorkManaAfterWitness;
   if (
     isMyTurn &&
     witnessAccessibleForNO &&
@@ -4931,7 +4946,8 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     } else if (noInGrave && !noInHand) {
       const witnessPath = witnessAccessibleForNO ?? (inHand.has("Eternal Witness") || faunaCanFetchWitness());
       if (witnessPath && mana < (faunaCanFetchWitness() && !inHand.has("Eternal Witness") ? 13 : 12)) {
-        suppressedWins.push({ label: "Natural Order win suppressed (via Eternal Witness)", reason: `only ${mana} mana (need ${faunaCanFetchWitness() && !inHand.has("Eternal Witness") ? 13 : 12} for Witness + Natural Order + Ashaya)` });
+        const baseNeed = faunaCanFetchWitness() && !inHand.has("Eternal Witness") ? 13 : 12;
+        suppressedWins.push({ label: "Natural Order win suppressed (via Eternal Witness)", reason: `only ${mana} mana (need ${baseNeed} without dork tap, or less if a big dork is on board)` });
       } else if (!witnessPath && (noInGrave)) {
         suppressedWins.push({ label: "Natural Order in graveyard", reason: "no way to retrieve it (need Eternal Witness in hand or Fauna Shaman on board)" });
       }
@@ -4994,6 +5010,25 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       isSuppressed: true,
     });
   }
+
+  // Derive confidence tier for each result based on category
+  results.forEach(r => {
+    if (r.confidence) return; // already set explicitly at emit site
+    const cat = r.category || "";
+    if (cat.includes("WIN NOW") || cat.includes("WIN PILE"))              r.confidence = "certain";
+    else if (cat.includes("WIN NEXT") || cat.includes("WIN TURN"))        r.confidence = "certain";
+    else if (cat.includes("INFINITE MANA") || cat.includes("LOOP READY") || cat.includes("MANA ONLINE")) r.confidence = "certain";
+    else if (cat.includes("DRAW YOUR LIBRARY") || cat.includes("DRAW ENGINE")) r.confidence = "certain";
+    else if (cat.includes("ENGINE READY") || cat.includes("ENGINE ACTIVE") || cat.includes("ACTIVATE")) r.confidence = "high";
+    else if (cat.includes("CAST TO ENABLE") || cat.includes("ASSEMBLE"))  r.confidence = "high";
+    else if (cat.includes("INSTANT SPEED WIN") || cat.includes("ONE PIECE AWAY")) r.confidence = "high";
+    else if (cat.includes("TUTOR") || cat.includes("YISAN") || cat.includes("ZENITH")) r.confidence = "high";
+    else if (cat.includes("NEARLY THERE") || cat.includes("RAMP"))        r.confidence = "good";
+    else if (cat.includes("BUILDING TOWARDS") || cat.includes("CARD ADVANTAGE")) r.confidence = "good";
+    else if (cat.includes("STAX") || cat.includes("OUPHE") || cat.includes("LAND")) r.confidence = "good";
+    else if (cat.includes("DRAW-GO") || cat.includes("PASS"))             r.confidence = "info";
+    else r.confidence = "speculative";
+  });
 
   // Sort by priority descending
   results.sort((a, b) => b.priority - a.priority);
@@ -5264,6 +5299,291 @@ function getPriorityTargets(battlefield, hand) {
 }
 
 // ============================================================
+// ============================================================
+// TOUR / ONBOARDING
+// ============================================================
+
+const TOUR_STEPS = [
+  {
+    target: "tour-header",
+    title: "Welcome to Yeva Advisor",
+    body: "This tool analyses your current Magic game state and tells you exactly what to do — combo lines, win paths, tutors, and engines. Let's walk through how to use it.",
+    placement: "bottom",
+    icon: "🌿",
+  },
+  {
+    target: "tour-turn",
+    title: "Set Whose Turn It Is",
+    body: "Toggle between My Turn and Opponent's Turn. This matters — some advice (flash-in plays via Yeva, instant-speed combos) only fires on your opponent's turn, while sorcery-speed plays like Green Sun's Zenith only show on yours.",
+    placement: "right",
+    icon: "⏱",
+  },
+  {
+    target: "tour-mana",
+    title: "Available Mana",
+    body: "Enter how much mana you currently have available. The advisor auto-estimates this from your battlefield, but you can override it. Mana thresholds determine whether combo lines are executable this turn.",
+    placement: "right",
+    icon: "💎",
+  },
+  {
+    target: "tour-hand",
+    title: "Add Cards in Your Hand",
+    body: "Type any card name — autocomplete shows matches instantly. Cards in your hand unlock new combo paths and tutors. The advisor knows which cards are flash-castable and accounts for Yeva's ability.",
+    placement: "right",
+    icon: "🃏",
+  },
+  {
+    target: "tour-battlefield",
+    title: "Add Your Battlefield",
+    body: "Everything you control goes here — creatures, lands, enchantments. The advisor counts elves, devotion, and creatures to calculate mana dork output, checks for infinite mana loops, and identifies which engines are already assembled.",
+    placement: "right",
+    icon: "⚔️",
+  },
+  {
+    target: "tour-advice",
+    title: "Read the Advice",
+    body: "Advice cards appear ranked by priority. 🔥 WIN NOW means an immediate win is available. 🎯 ONE PIECE AWAY means one tutor away. Click any card to expand step-by-step instructions. The ◆ pips show how certain the line is.",
+    placement: "left",
+    icon: "📋",
+  },
+  {
+    target: "tour-deck",
+    title: "Optional: Load a Deck",
+    body: "Click the 📦 DECKS button to load your decklist. When active, autocomplete only shows cards in your deck, and advice is filtered to cards you actually run. Use the preset 'Yeva Competitive' deck to get started immediately.",
+    placement: "bottom",
+    icon: "📦",
+  },
+];
+
+function useTour() {
+  const [active, setActive] = useState(false);
+  const [step, setStep]     = useState(0);
+
+  useEffect(() => {
+    try {
+      const seen = localStorage.getItem("yeva-tour-seen");
+      if (!seen) { setActive(true); setStep(0); }
+    } catch {}
+  }, []);
+
+  const finish = () => {
+    setActive(false);
+    try { localStorage.setItem("yeva-tour-seen", "1"); } catch {}
+  };
+
+  const next = () => {
+    if (step >= TOUR_STEPS.length - 1) { finish(); return; }
+    setStep(s => s + 1);
+  };
+
+  const prev  = () => setStep(s => Math.max(0, s - 1));
+  const start = () => { setStep(0); setActive(true); };
+  const skip  = () => finish();
+
+  return { active, step, next, prev, start, skip, total: TOUR_STEPS.length };
+}
+
+function TourOverlay({ active, step, next, prev, skip, total }) {
+  const [targetRect, setTargetRect] = useState(null);
+  const [visible, setVisible] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
+
+  useEffect(() => {
+    if (!active) { setVisible(false); setTargetRect(null); return; }
+    // Small delay so DOM is ready
+    const t = setTimeout(() => {
+      const el = document.querySelector(`[data-tour="${TOUR_STEPS[step].target}"]`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        setTargetRect(rect);
+      } else {
+        setTargetRect(null);
+      }
+      setVisible(true);
+      setTransitioning(false);
+    }, 80);
+    return () => clearTimeout(t);
+  }, [active, step]);
+
+  const handleNext = () => {
+    setTransitioning(true);
+    setVisible(false);
+    setTimeout(next, 180);
+  };
+  const handlePrev = () => {
+    setTransitioning(true);
+    setVisible(false);
+    setTimeout(prev, 180);
+  };
+
+  if (!active) return null;
+
+  const tourStep = TOUR_STEPS[step];
+  const PAD = 8; // spotlight padding
+
+  // Compute spotlight rect
+  const spot = targetRect ? {
+    x: targetRect.left - PAD,
+    y: targetRect.top - PAD,
+    w: targetRect.width + PAD * 2,
+    h: targetRect.height + PAD * 2,
+  } : null;
+
+  // Compute tooltip position
+  const tooltipW = 320;
+  const tooltipH = 200;
+  let tipX = 0, tipY = 0;
+  if (spot) {
+    const placement = tourStep.placement;
+    if (placement === "right") {
+      tipX = spot.x + spot.w + 16;
+      tipY = spot.y + spot.h / 2 - tooltipH / 2;
+    } else if (placement === "left") {
+      tipX = spot.x - tooltipW - 16;
+      tipY = spot.y + spot.h / 2 - tooltipH / 2;
+    } else if (placement === "bottom") {
+      tipX = spot.x + spot.w / 2 - tooltipW / 2;
+      tipY = spot.y + spot.h + 16;
+    } else {
+      tipX = spot.x + spot.w / 2 - tooltipW / 2;
+      tipY = spot.y - tooltipH - 16;
+    }
+    // Clamp to viewport
+    tipX = Math.max(12, Math.min(window.innerWidth - tooltipW - 12, tipX));
+    tipY = Math.max(12, Math.min(window.innerHeight - tooltipH - 12, tipY));
+  } else {
+    // Fallback: center
+    tipX = window.innerWidth / 2 - tooltipW / 2;
+    tipY = window.innerHeight / 2 - tooltipH / 2;
+  }
+
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9000, pointerEvents: "all" }}>
+      {/* Dimming overlay using SVG clip path for spotlight */}
+      <svg
+        width={vw} height={vh}
+        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      >
+        <defs>
+          <mask id="tour-mask">
+            <rect width={vw} height={vh} fill="white" />
+            {spot && (
+              <rect
+                x={spot.x} y={spot.y} width={spot.w} height={spot.h}
+                rx={8} fill="black"
+              />
+            )}
+          </mask>
+        </defs>
+        <rect
+          width={vw} height={vh}
+          fill="rgba(0,0,0,0.72)"
+          mask="url(#tour-mask)"
+        />
+        {/* Spotlight border glow */}
+        {spot && (
+          <rect
+            x={spot.x} y={spot.y} width={spot.w} height={spot.h}
+            rx={8} fill="none"
+            stroke="#4a9e4a" strokeWidth={2}
+            style={{ opacity: visible ? 1 : 0, transition: "opacity 0.2s" }}
+          />
+        )}
+      </svg>
+
+      {/* Click-through area over spotlight so user can interact if needed */}
+      {spot && (
+        <div style={{
+          position: "absolute",
+          left: spot.x, top: spot.y, width: spot.w, height: spot.h,
+          borderRadius: 8,
+          pointerEvents: "none",
+        }} />
+      )}
+
+      {/* Backdrop click to advance */}
+      <div style={{ position: "absolute", inset: 0 }} onClick={handleNext} />
+
+      {/* Tooltip card */}
+      <div style={{
+        position: "absolute",
+        left: tipX, top: tipY,
+        width: tooltipW,
+        background: "linear-gradient(135deg, #0f1e0f 0%, #0a160a 100%)",
+        border: "1px solid #4a9e4a",
+        borderRadius: 12,
+        boxShadow: "0 0 0 1px #4a9e4a22, 0 24px 60px rgba(0,0,0,0.9), 0 0 40px #4a9e4a18",
+        padding: "20px 22px",
+        pointerEvents: "all",
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0) scale(1)" : "translateY(6px) scale(0.97)",
+        transition: "opacity 0.2s ease, transform 0.2s ease",
+      }}>
+        {/* Step indicator */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 14, alignItems: "center" }}>
+          {Array.from({ length: total }).map((_, i) => (
+            <div key={i} style={{
+              height: 3, flex: 1,
+              borderRadius: 2,
+              background: i <= step ? "#4a9e4a" : "#1e3a1e",
+              transition: "background 0.3s",
+            }} />
+          ))}
+        </div>
+
+        {/* Icon + title */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <span style={{ fontSize: 22, lineHeight: 1 }}>{tourStep.icon}</span>
+          <div style={{
+            fontFamily: "'Cinzel', serif", fontSize: 13, fontWeight: 600,
+            color: "#c8e6c8", letterSpacing: "0.5px",
+          }}>{tourStep.title}</div>
+        </div>
+
+        {/* Body */}
+        <p style={{
+          fontFamily: "'Crimson Text', serif", fontSize: 14, lineHeight: 1.6,
+          color: "#a0cda0", margin: "0 0 18px",
+        }}>{tourStep.body}</p>
+
+        {/* Controls */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {step > 0 && (
+            <button onClick={e => { e.stopPropagation(); handlePrev(); }} style={{
+              background: "none", border: "1px solid #1e3a1e",
+              borderRadius: 6, padding: "6px 14px",
+              color: "#7aad7a", cursor: "pointer",
+              fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: "1px",
+            }}>← BACK</button>
+          )}
+          <div style={{ flex: 1 }} />
+          <button onClick={e => { e.stopPropagation(); skip(); }} style={{
+            background: "none", border: "none",
+            color: "#4a6a4a", cursor: "pointer",
+            fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: "1px",
+            padding: "6px 8px",
+          }}>SKIP</button>
+          <button onClick={e => { e.stopPropagation(); handleNext(); }} style={{
+            background: "linear-gradient(135deg, #2d5a2d, #1e3a1e)",
+            border: "1px solid #4a9e4a",
+            borderRadius: 6, padding: "7px 18px",
+            color: "#c8e6c8", cursor: "pointer",
+            fontFamily: "'Cinzel', serif", fontSize: 11, letterSpacing: "1px",
+            fontWeight: 600,
+            boxShadow: "0 0 12px #4a9e4a22",
+          }}>
+            {step === total - 1 ? "DONE ✓" : "NEXT →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // UI COMPONENTS
 // ============================================================
 const COLORS = {
@@ -5386,6 +5706,7 @@ function CardInput({ label, zone, cards, onAdd, onRemove, placeholder, deckCards
   const [input, setInput] = useState("");
   const [suggs, setSuggs] = useState([]);
   const [selectedIdx, setSelectedIdx] = useState(-1);
+  const inputRef = useRef(""); // tracks latest value to detect stale async closures
 
   const [secret, setSecret] = useState(null);
 
@@ -5394,27 +5715,42 @@ function CardInput({ label, zone, cards, onAdd, onRemove, placeholder, deckCards
 
   const handleChange = (v) => {
     setInput(v);
+    inputRef.current = v;
     if (v.length < 2) { setSuggs([]); return; }
-    // Check for secret card names via SHA-256 hash (async)
+    // Synchronously compute suggestions so the list updates immediately on every keystroke,
+    // with no stale results lingering while the async secret-card hash is in flight.
+    const q = v.toLowerCase();
+    const seen = new Set();
+    const matches = searchPool.filter(n => {
+      if (seen.has(n)) return false; // deduplicate (deck pools have multiple Forest etc.)
+      if (!n.toLowerCase().includes(q)) return false;
+      const isBasic = CARDS[n]?.tags?.includes("basic");
+      if (!isBasic && cards.includes(n)) return false;
+      if (zone === "battlefield") {
+        const type = CARDS[n]?.type;
+        if (type === "instant" || type === "sorcery") return false;
+      }
+      seen.add(n);
+      return true;
+    });
+    matches.sort((a, b) => {
+      const aPrefix = a.toLowerCase().startsWith(q);
+      const bPrefix = b.toLowerCase().startsWith(q);
+      if (aPrefix !== bPrefix) return aPrefix ? -1 : 1;
+      return a.length - b.length;
+    });
+    setSuggs(matches.slice(0, 7));
+    // Also check for secret card names via SHA-256 hash (async) — overrides suggestions if matched
     crypto.subtle.digest("SHA-256",
       new TextEncoder().encode(v.toLowerCase())
     ).then(buf => {
+      if (inputRef.current !== v) return; // input changed — discard stale result
       const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
       if (SECRET_CARDS[hex]) {
         setSecret(SECRET_CARDS[hex]);
         setSuggs([]);
       } else {
         setSecret(null);
-        setSuggs(searchPool.filter(n => {
-          if (!n.toLowerCase().includes(v.toLowerCase())) return false;
-          const isBasic = CARDS[n]?.tags?.includes("basic");
-          if (!isBasic && cards.includes(n)) return false;
-          if (zone === "battlefield") {
-            const type = CARDS[n]?.type;
-            if (type === "instant" || type === "sorcery") return false;
-          }
-          return true;
-        }).slice(0, 7));
       }
     });
   };
@@ -5494,7 +5830,7 @@ function CardInput({ label, zone, cards, onAdd, onRemove, placeholder, deckCards
             boxShadow: "0 12px 40px rgba(0,0,0,0.8)",
           }}>
             {suggs.map((s, si) => (
-              <div key={s} onMouseDown={() => { add(s); setSelectedIdx(-1); }} style={{
+              <div key={`${s}-${si}`} onMouseDown={() => { add(s); setSelectedIdx(-1); }} style={{
                 padding: "9px 14px", cursor: "pointer",
                 color: COLORS.textMid, fontSize: "13px",
                 fontFamily: "'Crimson Text', serif",
@@ -5872,6 +6208,34 @@ function HighlightedText({ text, activeCards, color }) {
   );
 }
 
+// Confidence indicator — diamond pips showing certainty tier
+const CONFIDENCE_CONFIG = {
+  certain:     { filled: 3, label: "Certain",     title: "Deterministic — this line wins or resolves with no decisions remaining" },
+  high:        { filled: 2, label: "Strong",      title: "Very likely correct — a concrete plan with known pieces" },
+  good:        { filled: 1, label: "Reasonable",  title: "Solid play — good direction but outcome depends on future draws" },
+  speculative: { filled: 0, label: "Speculative", title: "Directional — worth considering but many unknowns remain" },
+  info:        { filled: 0, label: "Info",        title: "Situational information" },
+};
+
+function ConfidencePips({ confidence, color }) {
+  const cfg = CONFIDENCE_CONFIG[confidence] || CONFIDENCE_CONFIG.speculative;
+  const dimColor = color + "33";
+  const fullColor = color;
+  return (
+    <span title={`${cfg.label}: ${cfg.title}`} style={{ display: "inline-flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
+      {[0, 1, 2].map(i => (
+        <span key={i} style={{
+          fontSize: "9px",
+          color: i < cfg.filled ? fullColor : dimColor,
+          lineHeight: 1,
+          filter: i < cfg.filled ? `drop-shadow(0 0 3px ${color}88)` : "none",
+          transition: "color 0.2s",
+        }}>◆</span>
+      ))}
+    </span>
+  );
+}
+
 function AdviceCard({ advice, index, activeCards, collapseKey }) {
   const [open, setOpen] = useState(index === 0);
 
@@ -5926,6 +6290,9 @@ function AdviceCard({ advice, index, activeCards, collapseKey }) {
         }}
       >
         <Tag label={advice.category} color={advice.color} />
+        {advice.confidence && advice.confidence !== "info" && (
+          <ConfidencePips confidence={advice.confidence} color={advice.color} />
+        )}
         <span style={{
           flex: 1, color: index === 0 ? COLORS.text : COLORS.textMid,
           fontFamily: "'Cinzel', serif",
@@ -6279,7 +6646,17 @@ function DeckDetailModal({ deck, onClose, onSave }) {
   const handleAddChange = (v) => {
     setAddInput(v);
     if (v.length < 2) { setAddSuggs([]); return; }
-    setAddSuggs(ALL_CARD_NAMES.filter(n => n.toLowerCase().includes(v.toLowerCase())).slice(0, 6));
+    const q = v.toLowerCase();
+    const matches = ALL_CARD_NAMES.filter(n => n.toLowerCase().includes(q));
+    // Rank: exact prefix first, then word-boundary prefix, then substring
+    matches.sort((a, b) => {
+      const al = a.toLowerCase(), bl = b.toLowerCase();
+      const aPrefix = al.startsWith(q), bPrefix = bl.startsWith(q);
+      if (aPrefix !== bPrefix) return aPrefix ? -1 : 1;
+      // Within prefix matches, shorter names first
+      return a.length - b.length;
+    });
+    setAddSuggs(matches.slice(0, 6));
   };
 
   const handleAddCard = (name) => {
@@ -6868,6 +7245,7 @@ function useForceGraph(nodeList, linkList, width, height, enabled) {
 
 function SynergyMapModal({ onClose }) {
   const containerRef = useRef(null);
+  const outerRef     = useRef(null);  // stable ref always in DOM for ResizeObserver
   const [view, setView]               = useState("graph");
   const [activeTypes, setActiveTypes] = useState(new Set(Object.keys(TYPE_COLORS)));
   const [selected, setSelected]       = useState(null);
@@ -6882,16 +7260,18 @@ function SynergyMapModal({ onClose }) {
   const panStartRef  = useRef({ x: 0, y: 0, px: 0, py: 0 });
   const [, forceUpdate] = useState(0);
 
-  // Measure container
+  // Measure the stable outer wrapper — always mounted regardless of view
   useEffect(() => {
-    if (!containerRef.current) return;
-    const ro = new ResizeObserver(([e]) => {
-      const { width, height } = e.contentRect;
+    if (!outerRef.current) return;
+    const measure = () => {
+      const { width, height } = outerRef.current.getBoundingClientRect();
       setDims({ w: Math.max(400, width), h: Math.max(300, height) });
-    });
-    ro.observe(containerRef.current);
+    };
+    measure(); // immediate measurement on mount or view change
+    const ro = new ResizeObserver(measure);
+    ro.observe(outerRef.current);
     return () => ro.disconnect();
-  }, []);
+  }, [view]); // re-measure when switching views so graph gets correct size
 
   // Build graph data
   const { nodes, links, cardCentrality } = React.useMemo(() => {
@@ -7033,7 +7413,7 @@ function SynergyMapModal({ onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, background:"#000000ee", zIndex:1050, display:"flex", flexDirection:"column" }}
       onClick={onClose}>
-      <div style={{ flex:1, display:"flex", flexDirection:"column", margin:"16px",
+      <div ref={outerRef} style={{ flex:1, display:"flex", flexDirection:"column", margin:"16px",
         background:"#0a160a", border:`1px solid ${COLORS.green1}44`, borderRadius:"12px", overflow:"hidden" }}
         onClick={e => e.stopPropagation()}>
 
@@ -7412,6 +7792,7 @@ function YevaAdvisor() {
   const { decks, activeDeckId, saveDecks, saveActiveDeck } = useDeckStorage();
   const [showDeckManager, setShowDeckManager] = useState(false);
   const [showSynergyMap, setShowSynergyMap]   = useState(false);
+  const tour = useTour();
 
   // Compute the active deck's card set for filtering
   const activeDeck = decks?.find(d => d.id === activeDeckId) ?? null;
@@ -7611,7 +7992,7 @@ function YevaAdvisor() {
           background: "#0a150a",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           flexWrap: "wrap", gap: "12px",
-        }}>
+        }} data-tour="tour-header">
           <div>
             <div style={{
               fontFamily: "'Cinzel', serif", fontSize: "22px",
@@ -7698,7 +8079,7 @@ function YevaAdvisor() {
               onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
             >⌗ DEBUG</button>
             {/* Deck selector */}
-            <button onClick={() => setShowDeckManager(true)} style={{
+            <button onClick={() => setShowDeckManager(true)} data-tour="tour-deck" style={{
               background: activeDeck ? "#1a3a1a" : "none",
               border: `1px solid ${activeDeck ? COLORS.green1 : COLORS.border}`,
               borderRadius: "6px", padding: "5px 14px",
@@ -7719,10 +8100,22 @@ function YevaAdvisor() {
               onMouseEnter={e => { e.target.style.borderColor = COLORS.red; e.target.style.color = COLORS.red; }}
               onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
             >↺ RESET</button>
+            <button onClick={tour.start} title="Show tutorial" style={{
+              background: "none", border: `1px solid ${COLORS.border}`,
+              borderRadius: "6px", padding: "5px 10px",
+              color: COLORS.textDim, cursor: "pointer",
+              fontFamily: "'Cinzel', serif", fontSize: "13px", letterSpacing: "0",
+              transition: "all 0.2s", lineHeight: 1,
+            }}
+              onMouseEnter={e => { e.target.style.borderColor = COLORS.green2; e.target.style.color = COLORS.green2; }}
+              onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
+            >?</button>
           </div>
 
           {/* SYNERGY MAP MODAL */}
           {showSynergyMap && <SynergyMapModal onClose={() => setShowSynergyMap(false)} />}
+          {/* TOUR OVERLAY */}
+          <TourOverlay active={tour.active} step={tour.step} next={tour.next} prev={tour.prev} skip={tour.skip} total={tour.total} />
           {/* SAVED STATES MODAL */}
           {showSavedStates && (
             <SavedStatesPanel
@@ -7890,7 +8283,7 @@ function YevaAdvisor() {
                 letterSpacing: "2px", color: COLORS.textDim,
                 marginBottom: "10px",
               }}>GAME STATE</div>
-              <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
+              <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "12px" }} data-tour="tour-turn">
                 {["My Turn", "Opponent's Turn"].map(label => {
                   const isMine = label === "My Turn";
                   const active = isMyTurn === isMine;
@@ -7906,7 +8299,7 @@ function YevaAdvisor() {
                   );
                 })}
               </div>
-              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }} data-tour="tour-mana">
                 <div>
                   <label style={{ fontFamily: "'Cinzel', serif", fontSize: "11px", color: COLORS.textDim, letterSpacing: "1px", whiteSpace: "nowrap", display: "block" }}>MANA AVAILABLE</label>
                   <span style={{ fontSize: "9px", color: COLORS.textDim, opacity: 0.6, fontFamily: "'Crimson Text', serif", fontStyle: "italic" }}>auto · override manually</span>
@@ -7954,20 +8347,24 @@ function YevaAdvisor() {
             <div style={{ height: "1px", background: COLORS.border, marginBottom: "16px" }} />
 
             {/* Hand */}
+            <div data-tour="tour-hand">
             <QuickAdd zone="hand" onAdd={addTo("hand")} deckCards={activeDeck?.cards} />
             <CardInput label="Hand" zone="hand" cards={hand}
               onRef={el => { zoneInputRefs.current["hand"] = el; }}
               onAdd={addTo("hand")} onRemove={removeFrom(setHand)}
               placeholder="Cards in your hand…"
               deckCards={activeDeck?.cards} />
+            </div>
 
             {/* Battlefield */}
+            <div data-tour="tour-battlefield">
             <QuickAdd zone="battlefield" onAdd={addTo("battlefield")} deckCards={activeDeck?.cards} />
             <CardInput label="Battlefield" zone="battlefield" cards={battlefield}
               onRef={el => { zoneInputRefs.current["battlefield"] = el; }}
               onAdd={addTo("battlefield")} onRemove={removeFrom(setBattlefield)}
               placeholder="Permanents you control…"
               deckCards={activeDeck?.cards} />
+            </div>
 
             {/* Graveyard */}
             <QuickAdd zone="graveyard" onAdd={addTo("graveyard")} deckCards={activeDeck?.cards} />
@@ -7994,6 +8391,7 @@ function YevaAdvisor() {
             ref={advicePanelRef}
             onScroll={handleAdviceScroll}
             className="panel-advice"
+            data-tour="tour-advice"
             style={{ flex: 1, padding: "20px 24px", overflowY: "auto" }}
           >
             {advice.length === 0 ? (
