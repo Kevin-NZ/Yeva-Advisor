@@ -8001,7 +8001,7 @@ function YevaAdvisor() {
               Yeva Draw-Grow
             </div>
             <div style={{ fontSize: "12px", color: COLORS.textDim, letterSpacing: "2px", fontFamily: "'Cinzel', serif" }}>
-              ADVISOR · MONO-GREEN CEDH · <span style={{ opacity: 0.5, letterSpacing: "1px" }}>v{__APP_VERSION__}</span><span style={{ opacity: 0.35, letterSpacing: "0.5px", fontSize: "9px" }}> ({__GIT_HASH__})</span>
+              ADVISOR · <span style={{ opacity: 0.5, letterSpacing: "1px" }}>v{__APP_VERSION__}</span><span style={{ opacity: 0.35, letterSpacing: "0.5px", fontSize: "9px" }}> ({__GIT_HASH__})</span>
             </div>
           </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
