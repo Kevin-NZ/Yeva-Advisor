@@ -7243,6 +7243,1050 @@ function useForceGraph(nodeList, linkList, width, height, enabled) {
   return [positions, posRef];
 }
 
+// ============================================================
+// GOLDFISH MODE
+// Simulates a game from a shuffled deck: draw opening hand,
+// step through turns, get advisor guidance each turn.
+// ============================================================
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Expand deck cards array: basics appear multiple times, non-basics once
+function buildLibrary(deckCards) {
+  // deckCards already has repeated basics (e.g. 10x "Forest")
+  return shuffleArray([...deckCards]);
+}
+
+// Card image shown during mulligan — fetches from Scryfall, shows spinner while loading.
+function MulliganCard({ card, toBottom, selectable, onClick }) {
+  const url = useScryfallImage(card);
+  const [hovered, setHovered] = useState(false);
+
+  const cardW = 130;
+  const cardH = 181; // standard MTG aspect ratio ~1.39
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={selectable ? (toBottom ? "Click to keep on top" : "Click to bottom") : card}
+      style={{
+        width: cardW, flexShrink: 0,
+        cursor: selectable ? "pointer" : "default",
+        transition: "transform 0.15s, opacity 0.15s",
+        transform: toBottom
+          ? "translateY(28px) rotate(3deg)"
+          : hovered && selectable ? "translateY(-8px)" : "translateY(0)",
+        opacity: toBottom ? 0.45 : 1,
+        position: "relative",
+      }}>
+      {/* Card frame */}
+      <div style={{
+        width: cardW, height: cardH, borderRadius: "8px", overflow: "hidden",
+        border: toBottom
+          ? `2px solid ${COLORS.gold}`
+          : hovered && selectable ? `2px solid ${COLORS.green2}` : `1px solid ${COLORS.border}`,
+        boxShadow: toBottom
+          ? "0 0 12px rgba(244,208,63,0.4)"
+          : hovered && selectable ? "0 8px 24px rgba(0,0,0,0.8)" : "0 2px 8px rgba(0,0,0,0.6)",
+        background: "#0d1a0d",
+        transition: "border 0.15s, box-shadow 0.15s",
+      }}>
+        {url && url !== "error" ? (
+          <img src={url} alt={card} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ) : url === "error" ? (
+          // Fallback card back
+          <div style={{
+            width: "100%", height: "100%", display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", padding: "8px",
+            background: "linear-gradient(160deg, #0a1a0a, #162816)",
+          }}>
+            <div style={{ fontSize: "24px", marginBottom: "8px" }}>🌿</div>
+            <div style={{ fontSize: "10px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", textAlign: "center", lineHeight: 1.3 }}>{card}</div>
+          </div>
+        ) : (
+          // Loading spinner
+          <div style={{
+            width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+            background: "linear-gradient(160deg, #0a1a0a, #162816)",
+          }}>
+            <div style={{ width: 24, height: 24, border: `2px solid ${COLORS.border}`, borderTopColor: COLORS.green2, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+          </div>
+        )}
+      </div>
+      {/* Bottom indicator */}
+      {toBottom && (
+        <div style={{
+          position: "absolute", bottom: -22, left: 0, right: 0, textAlign: "center",
+          fontSize: "9px", color: COLORS.gold, fontFamily: "'Cinzel', serif", letterSpacing: "1px",
+        }}>BOTTOM</div>
+      )}
+      {/* Card name below image */}
+      <div style={{
+        marginTop: "5px", fontSize: "10px", color: toBottom ? COLORS.gold : COLORS.textDim,
+        fontFamily: "'Crimson Text', serif", textAlign: "center", lineHeight: 1.2,
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: cardW,
+      }}>{card}</div>
+    </div>
+  );
+}
+
+// Stable wrapper that tracks hover state without being remounted.
+// Uses render-prop pattern so the inner span can be defined inline.
+function HoverCard({ card, children }) {
+  const [hovered, setHovered] = useState(false);
+  const [rect, setRect] = useState(null);
+  const ref = useRef(null);
+  return (
+    <span ref={ref}
+      onMouseEnter={() => { setRect(ref.current?.getBoundingClientRect() || null); setHovered(true); }}
+      onMouseLeave={() => setHovered(false)}
+      style={{ display: "inline-flex" }}>
+      {children(rect, hovered)}
+    </span>
+  );
+}
+
+function GoldfishModal({ activeDeck, onClose, onLoadState }) {
+  // ── state ──────────────────────────────────────────────────
+  const [phase, setPhase] = useState("setup"); // setup | mulligan | playing
+  const [library, setLibrary] = useState([]);
+  const [hand, setHand] = useState([]);
+  const [battlefield, setBattlefield] = useState([]);
+  const [graveyard, setGraveyard] = useState([]);
+  const [exile, setExile] = useState([]);
+  const [turnNumber, setTurnNumber] = useState(1);
+  const turnRef = useRef(1); // mirrors turnNumber, always current value
+  const [isMyTurn, setIsMyTurn] = useState(true);
+  const [landPlayed, setLandPlayed] = useState(false);
+  const [log, setLog] = useState([]);
+  const [mulliganCount, setMulliganCount] = useState(0);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [pendingBottoms, setPendingBottoms] = useState([]);
+  const [phase2, setPhase2] = useState(null);
+  const [yevaTax, setYevaTax] = useState(0);
+  const [showTutor, setShowTutor] = useState(false);
+  const [tutorQuery, setTutorQuery] = useState("");
+  const tutorInputRef = useRef(null);
+  // Tap state: Set of "card:index" keys for tapped permanents
+  const [tapped, setTapped] = useState(new Set());
+  // Counter map: "card:index" → number
+  const [counters, setCounters] = useState({});
+  // Scry state
+  const [scryN, setScryN] = useState(3);
+  const [showScry, setShowScry] = useState(false);
+  const [scryOrder, setScryOrder] = useState([]); // current top-N reorder
+  const [scryBottom, setScryBottom] = useState(new Set()); // indices to bottom
+
+  const deckCards = activeDeck?.cards ?? [];
+  const hasDeck = deckCards.length > 0;
+
+  // ── derived analysis ────────────────────────────────────────
+  // Pass untapped battlefield cards only for mana — tapped cards can't tap for mana
+  const untappedBattlefield = battlefield.filter((_, i) => !tapped.has(`${battlefield[i]}:${i}`));
+  const analysis = React.useMemo(() => {
+    if (hand.length + battlefield.length === 0) return null;
+    try {
+      return analyzeGameState({
+        hand, battlefield, graveyard,
+        manaAvailable: calculateBattlefieldMana(untappedBattlefield),
+        isMyTurn, deckList: activeDeck ? new Set(deckCards) : null,
+      });
+    } catch { return null; }
+  }, [hand, battlefield, graveyard, isMyTurn, tapped]);
+
+  // ── helpers ─────────────────────────────────────────────────
+  function addLog(msg, color) {
+    setLog(prev => [{ msg, color: color || COLORS.textMid, turn: turnNumber }, ...prev].slice(0, 100));
+  }
+
+  function cardKey(card, i) { return `${card}:${i}`; }
+
+  function startGame() {
+    const lib = buildLibrary(deckCards);
+    setLibrary(lib.slice(7));
+    setHand(lib.slice(0, 7));
+    setBattlefield([]); setGraveyard([]); setExile([]);
+    setTurnNumber(1); turnRef.current = 1; setIsMyTurn(true); setLandPlayed(false);
+    setMulliganCount(0); setLog([]); setPendingBottoms([]);
+    setPhase2(null); setYevaTax(0);
+    setTapped(new Set()); setCounters({});
+    setPhase("mulligan");
+    addLog("Game started — 7-card opening hand drawn.", COLORS.green2);
+  }
+
+  function doMulligan() {
+    const newCount = mulliganCount + 1;
+    const lib = buildLibrary(deckCards);
+    setLibrary(lib.slice(7));
+    setMulliganCount(newCount);
+    setHand(lib.slice(0, 7));
+    setPendingBottoms([]);
+    const bottomCount = Math.max(0, newCount - 1);
+    setPhase2(bottomCount > 0 ? "bottoming" : null);
+    if (bottomCount === 0) {
+      addLog(`Mulligan #${newCount} — free! Drew 7, no cards to bottom.`, COLORS.gold);
+    } else {
+      addLog(`Mulligan #${newCount} — drew 7, choose ${bottomCount} card${bottomCount > 1 ? "s" : ""} to bottom.`, COLORS.gold);
+    }
+  }
+
+  function toggleBottom(card, idx) {
+    const key = `${card}:${idx}`;
+    setPendingBottoms(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  }
+
+  function confirmBottom() {
+    const bottomCount = Math.max(0, mulliganCount - 1);
+    if (pendingBottoms.length !== bottomCount) return;
+    const bottomed = pendingBottoms.map(k => k.split(":")[0]);
+    const newHand = [...hand];
+    bottomed.forEach(card => { const i = newHand.indexOf(card); if (i >= 0) newHand.splice(i, 1); });
+    setHand(newHand);
+    setLibrary(prev => [...prev, ...shuffleArray(bottomed)]);
+    setPendingBottoms([]); setPhase2(null);
+    addLog(`Bottomed ${bottomCount} card${bottomCount > 1 ? "s" : ""}. Keeping ${newHand.length} cards.`, COLORS.textMid);
+  }
+
+  function keepHand() {
+    setPhase("playing");
+    addLog(`Kept ${hand.length}-card hand. Turn 1 begins.`, COLORS.green1);
+  }
+
+  function drawCard(n = 1) {
+    if (library.length === 0) { addLog("Library empty — cannot draw!", COLORS.red); return; }
+    const drawn = library.slice(0, n);
+    setHand(prev => [...prev, ...drawn]);
+    setLibrary(prev => prev.slice(n));
+    addLog(`Drew ${drawn.length > 1 ? drawn.length + " cards" : drawn[0]}.`, COLORS.blue);
+  }
+
+  // ── UNTAP ALL ───────────────────────────────────────────────
+  function untapAll() {
+    setTapped(new Set());
+    setLandPlayed(false);
+    addLog("Untap step — all permanents untapped.", COLORS.green1);
+  }
+
+  // ── NEXT TURN ───────────────────────────────────────────────
+  function nextTurn() {
+    const next = turnRef.current + 1;
+    turnRef.current = next;
+    setTurnNumber(next);
+    setIsMyTurn(true);
+    setTapped(new Set());
+    setLandPlayed(false);
+    setLibrary(lib => {
+      if (lib.length === 0) {
+        setLog(l => [{ msg: `── Turn ${next} — untap, upkeep (library empty) ──`, color: COLORS.green3, turn: next }, ...l].slice(0, 100));
+        return lib;
+      }
+      const drawn = lib[0];
+      setHand(h => [...h, drawn]);
+      setLog(l => [
+        { msg: `Drew ${drawn}.`, color: COLORS.blue, turn: next },
+        { msg: `── Turn ${next} — untap, upkeep, draw ──`, color: COLORS.green3, turn: next },
+        ...l,
+      ].slice(0, 100));
+      return lib.slice(1);
+    });
+  }
+
+  function toggleTurn() {
+    setIsMyTurn(prev => {
+      addLog(prev ? "Passing to opponent's turn." : "Returning to your turn.", COLORS.textDim);
+      return !prev;
+    });
+  }
+
+  // ── TAP / UNTAP ─────────────────────────────────────────────
+  function toggleTap(card, i) {
+    const key = cardKey(card, i);
+    setTapped(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) { next.delete(key); addLog(`Untapped ${card}.`, COLORS.textDim); }
+      else { next.add(key); addLog(`Tapped ${card}.`, COLORS.textDim); }
+      return next;
+    });
+  }
+
+  // ── COUNTERS ────────────────────────────────────────────────
+  function adjustCounter(card, i, delta) {
+    const key = cardKey(card, i);
+    setCounters(prev => {
+      const cur = prev[key] ?? 0;
+      const next = Math.max(0, cur + delta);
+      const updated = { ...prev, [key]: next };
+      if (next === 0) delete updated[key];
+      return updated;
+    });
+  }
+
+  // ── CAST FROM HAND (single click) ───────────────────────────
+  function castFromHand(card, idx) {
+    const type = CARDS[card]?.type;
+    // Remove from hand
+    setHand(prev => [...prev.slice(0, idx), ...prev.slice(idx + 1)]);
+    if (type === "land") {
+      if (landPlayed) { addLog(`Already played a land this turn — ${card} returned to hand.`, COLORS.red); setHand(prev => [...prev, card]); return; }
+      setBattlefield(prev => [...prev, card]);
+      setLandPlayed(true);
+      addLog(`Played ${card}.`, COLORS.green1);
+    } else if (type === "instant" || type === "sorcery") {
+      setGraveyard(prev => [...prev, card]);
+      addLog(`Cast ${card} → graveyard.`, COLORS.textMid);
+    } else {
+      setBattlefield(prev => [...prev, card]);
+      addLog(`Cast ${card} → battlefield.`, COLORS.green2);
+    }
+  }
+
+  // ── YEVA ────────────────────────────────────────────────────
+  function castYeva() {
+    const inHand = hand.includes("Yeva, Nature's Herald");
+    if (inHand) setHand(prev => { const i = prev.indexOf("Yeva, Nature's Herald"); return [...prev.slice(0,i), ...prev.slice(i+1)]; });
+    setBattlefield(prev => { const without = prev.filter(c => c !== "Yeva, Nature's Herald"); return [...without, "Yeva, Nature's Herald"]; });
+    const totalCost = 4 + yevaTax;
+    setYevaTax(prev => prev + 2);
+    addLog(`Cast Yeva from ${inHand ? "hand" : "command zone"} for ${totalCost} mana (tax: +${yevaTax}).`, COLORS.green2);
+  }
+
+  // ── TUTOR ───────────────────────────────────────────────────
+  function openTutor() { setShowTutor(true); setTutorQuery(""); setTimeout(() => tutorInputRef.current?.focus(), 50); }
+
+  function tutorCard(card) {
+    const idx = library.indexOf(card);
+    if (idx === -1) { addLog(`${card} not found in library.`, COLORS.red); return; }
+    setLibrary(prev => [...prev.slice(0, idx), ...prev.slice(idx + 1)]);
+    setHand(prev => [...prev, card]);
+    setShowTutor(false); setTutorQuery("");
+    addLog(`Tutored: ${card} → hand. Library shuffled.`, COLORS.purple);
+  }
+
+  // ── SCRY ────────────────────────────────────────────────────
+  function openScry(n) {
+    const top = library.slice(0, n);
+    setScryOrder(top);
+    setScryBottom(new Set());
+    setShowScry(true);
+    setScryN(n);
+  }
+
+  function scryToggleBottom(idx) {
+    setScryBottom(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next; });
+  }
+
+  function scryMoveUp(idx) {
+    if (idx === 0) return;
+    setScryOrder(prev => { const a = [...prev]; [a[idx-1], a[idx]] = [a[idx], a[idx-1]]; return a; });
+  }
+
+  function scryMoveDown(idx) {
+    setScryOrder(prev => { if (idx >= prev.length - 1) return prev; const a = [...prev]; [a[idx], a[idx+1]] = [a[idx+1], a[idx]]; return a; });
+  }
+
+  function confirmScry() {
+    const keep = scryOrder.filter((_, i) => !scryBottom.has(i));
+    const bottom = scryOrder.filter((_, i) => scryBottom.has(i));
+    setLibrary(prev => [...keep, ...prev.slice(scryN), ...shuffleArray(bottom)]);
+    setShowScry(false);
+    addLog(`Scried ${scryN}: kept ${keep.length} on top${bottom.length > 0 ? `, bottomed ${bottom.length}` : ""}.`, COLORS.blue);
+  }
+
+  // ── FETCH CRACK ─────────────────────────────────────────────
+  function crackFetch(card, fromZone) {
+    // Move fetch to graveyard
+    if (fromZone === "hand") setHand(prev => { const i = prev.indexOf(card); return [...prev.slice(0,i), ...prev.slice(i+1)]; });
+    else if (fromZone === "battlefield") {
+      setBattlefield(prev => { const i = prev.indexOf(card); return [...prev.slice(0,i), ...prev.slice(i+1)]; });
+      setTapped(prev => { const next = new Set(prev); next.delete(card + ":" + battlefield.indexOf(card)); return next; });
+    }
+    setGraveyard(prev => [...prev, card]);
+    // Find a Forest in library
+    const forestIdx = library.findIndex(c => c === "Forest" || CARDS[c]?.tags?.includes("forest") || CARDS[c]?.tags?.includes("basic"));
+    if (forestIdx === -1) {
+      addLog(`Cracked ${card} → graveyard, but no Forest found in library.`, COLORS.red);
+    } else {
+      const found = library[forestIdx];
+      setLibrary(prev => [...prev.slice(0, forestIdx), ...prev.slice(forestIdx + 1)]);
+      setBattlefield(prev => [...prev, found]);
+      setLandPlayed(true);
+      addLog(`Cracked ${card} → graveyard. Fetched ${found} → battlefield (tapped).`, COLORS.green1);
+      // Fetched land enters tapped
+      setBattlefield(prev => {
+        const newIdx = prev.length; // will be appended
+        setTapped(t => { const next = new Set(t); next.add(`${found}:${newIdx}`); return next; });
+        return prev;
+      });
+    }
+    closeContextMenu();
+  }
+
+  // ── MOVE CARD (context menu) ─────────────────────────────────
+  function openContextMenu(card, index, zone, e) {
+    e.preventDefault(); e.stopPropagation();
+    setContextMenu({ card, index, zone, x: e.clientX, y: e.clientY });
+  }
+  function closeContextMenu() { setContextMenu(null); }
+
+  function moveCard(card, fromZone, toZone, fromIndex) {
+    const removeFn = (setter, arr) => setter(prev => {
+      const i = fromIndex !== undefined ? fromIndex : prev.indexOf(card);
+      return i === -1 ? prev : [...prev.slice(0, i), ...prev.slice(i + 1)];
+    });
+    if (fromZone === "hand") removeFn(setHand, hand);
+    else if (fromZone === "battlefield") {
+      removeFn(setBattlefield, battlefield);
+      // Clean up tap/counter state for this card
+      const key = cardKey(card, fromIndex ?? battlefield.indexOf(card));
+      setTapped(prev => { const next = new Set(prev); next.delete(key); return next; });
+      setCounters(prev => { const next = { ...prev }; delete next[key]; return next; });
+    }
+    else if (fromZone === "graveyard") removeFn(setGraveyard, graveyard);
+    else if (fromZone === "exile") removeFn(setExile, exile);
+    else if (fromZone === "library") setLibrary(prev => { const i = prev.indexOf(card); return i === -1 ? prev : [...prev.slice(0,i), ...prev.slice(i+1)]; });
+
+    if (toZone === "hand") setHand(prev => [...prev, card]);
+    else if (toZone === "battlefield") {
+      const type = CARDS[card]?.type;
+      if (type === "instant" || type === "sorcery") { setGraveyard(prev => [...prev, card]); addLog(`${card} → graveyard (instant/sorcery).`, COLORS.textDim); closeContextMenu(); return; }
+      setBattlefield(prev => [...prev, card]);
+    }
+    else if (toZone === "graveyard") setGraveyard(prev => [...prev, card]);
+    else if (toZone === "exile") { setExile(prev => [...prev, card]); addLog(`${card} exiled.`, COLORS.textDim); closeContextMenu(); return; }
+
+    addLog(`${card}: ${fromZone} → ${toZone}.`, COLORS.textMid);
+    closeContextMenu();
+  }
+
+  function exportToAdvisor() {
+    onLoadState({ hand, battlefield, graveyard, mana: calculateBattlefieldMana(untappedBattlefield), isMyTurn });
+    onClose();
+  }
+
+  // Close context menu on any mousedown outside it
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = () => { closeContextMenu(); };
+    window.addEventListener("mousedown", handler);
+    return () => window.removeEventListener("mousedown", handler);
+  }, [contextMenu]);
+
+  // ── renderCard — card pill with hover image ──────────────────
+  // Defined as a render function (not a component) so React doesn't
+  // remount it on every parent render, which would kill hover state
+  // and cause the context menu to disappear.
+  const renderCard = (card, i, zone, { isTap = false, curCount = 0, onClick, style: extraStyle } = {}) => {
+    const isLand = CARDS[card]?.type === "land";
+    const fetch = isFetch(card);
+    return (
+      <HoverCard key={`${zone}:${card}:${i}`} card={card}>
+        {(rect, hovered) => (
+          <span
+            onClick={onClick}
+            onContextMenu={e => openContextMenu(card, i, zone, e)}
+            style={{ ...cardPillStyle(isTap, false), ...extraStyle }}>
+            {isTap ? "↷ " : ""}{card}
+            {curCount > 0 && (
+              <span style={{ background: COLORS.gold, color: "#000", borderRadius: "10px", padding: "0 5px", fontSize: "9px", fontWeight: "bold" }}>
+                {curCount}
+              </span>
+            )}
+            {isLand && zone === "hand" && <span style={{ fontSize: "9px", color: COLORS.textDim }}>🌲</span>}
+            {fetch && <span style={{ fontSize: "9px", color: COLORS.blue }}>⚓</span>}
+            {hovered && <CardTooltip name={card} anchorRect={rect} />}
+          </span>
+        )}
+      </HoverCard>
+    );
+  };
+
+  // ── render helpers ──────────────────────────────────────────
+  const isFetch = (card) => CARDS[card]?.tags?.includes("fetch");
+
+  const cardPillStyle = (isTapped, isSelected) => ({
+    display: "inline-flex", alignItems: "center", gap: "4px",
+    padding: "3px 7px", margin: "2px",
+    background: isSelected ? "#1a3a1a" : isTapped ? "#150f05" : "#0f1e0f",
+    border: `1px solid ${isSelected ? COLORS.green1 : isTapped ? "#5a4010" : COLORS.border}`,
+    borderRadius: "4px", fontSize: "11px",
+    color: isSelected ? COLORS.green2 : isTapped ? "#9a7830" : COLORS.textMid,
+    cursor: "pointer", userSelect: "none",
+    fontFamily: "'Crimson Text', serif",
+    opacity: isTapped ? 0.75 : 1,
+    fontStyle: isTapped ? "italic" : "normal",
+    transition: "all 0.1s",
+  });
+
+  const zoneLabel = (label, count, color) => (
+    <div style={{ fontSize: "10px", letterSpacing: "2px", color: color || COLORS.textDim,
+      fontFamily: "'Cinzel', serif", marginBottom: "6px", display: "flex", justifyContent: "space-between" }}>
+      <span>{label}</span><span style={{ color: COLORS.textDim }}>{count}</span>
+    </div>
+  );
+
+  const btnStyle = (color) => ({
+    background: "none", border: `1px solid ${color || COLORS.border}`, borderRadius: "6px",
+    padding: "4px 10px", color: color || COLORS.textDim, cursor: "pointer",
+    fontFamily: "'Cinzel', serif", fontSize: "10px", letterSpacing: "1px", flexShrink: 0,
+  });
+
+  // ── Context menu popup ───────────────────────────────────────
+  const ContextMenuPopup = () => {
+    if (!contextMenu) return null;
+    const { card, index, zone } = contextMenu;
+    const targets = ["battlefield", "hand", "graveyard", "exile"].filter(z => z !== zone);
+    const canFetch = isFetch(card) && (zone === "hand" || zone === "battlefield");
+    const isBF = zone === "battlefield";
+    const key = cardKey(card, index);
+    const isCardTapped = tapped.has(key);
+    const curCounters = counters[key] ?? 0;
+    return (
+      <div onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} style={{
+        position: "fixed", left: Math.min(contextMenu.x, window.innerWidth - 200), top: Math.min(contextMenu.y, window.innerHeight - 300),
+        zIndex: 9999, background: "#0d1f0d", border: `1px solid ${COLORS.borderBright}`,
+        borderRadius: "8px", padding: "6px 0", minWidth: "190px",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.8)", fontFamily: "'Cinzel', serif", fontSize: "11px",
+      }}>
+        <div style={{ padding: "6px 14px 4px", color: COLORS.green3, fontSize: "10px", letterSpacing: "1px", borderBottom: `1px solid ${COLORS.border}`, marginBottom: "4px" }}>
+          {card}
+        </div>
+        {/* Tap/untap for battlefield cards */}
+        {isBF && (
+          <div onClick={() => { toggleTap(card, index); closeContextMenu(); }} style={{ padding: "6px 14px", cursor: "pointer", color: isCardTapped ? COLORS.green2 : COLORS.textMid, letterSpacing: "1px" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#1a3a1a"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+            {isCardTapped ? "↺ Untap" : "↷ Tap"}
+          </div>
+        )}
+        {/* Counters for battlefield cards */}
+        {isBF && (
+          <div style={{ padding: "4px 14px", display: "flex", alignItems: "center", gap: "8px", borderBottom: `1px solid ${COLORS.border}`, marginBottom: "4px" }}>
+            <span style={{ color: COLORS.textDim, fontSize: "10px", letterSpacing: "1px" }}>COUNTERS</span>
+            <button onClick={(e) => { e.stopPropagation(); adjustCounter(card, index, -1); }} style={{ ...btnStyle(COLORS.red), padding: "1px 7px", fontSize: "12px" }}>−</button>
+            <span style={{ color: curCounters > 0 ? COLORS.gold : COLORS.textDim, minWidth: "20px", textAlign: "center", fontSize: "12px" }}>{curCounters}</span>
+            <button onClick={(e) => { e.stopPropagation(); adjustCounter(card, index, +1); }} style={{ ...btnStyle(COLORS.green1), padding: "1px 7px", fontSize: "12px" }}>+</button>
+          </div>
+        )}
+        {/* Fetch crack */}
+        {canFetch && (
+          <div onClick={() => crackFetch(card, zone)} style={{ padding: "6px 14px", cursor: "pointer", color: COLORS.gold, letterSpacing: "1px" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#1a1a0a"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+            🌊 Crack Fetch → Forest
+          </div>
+        )}
+        {/* Zone moves */}
+        {targets.map(t => (
+          <div key={t} onClick={() => moveCard(card, zone, t, index)} style={{ padding: "6px 14px", cursor: "pointer", color: COLORS.textMid, letterSpacing: "1px" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#1a3a1a"; e.currentTarget.style.color = COLORS.green2; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = COLORS.textMid; }}>
+            → {t.charAt(0).toUpperCase() + t.slice(1)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ── Scry modal ───────────────────────────────────────────────
+  const ScryModal = () => {
+    if (!showScry) return null;
+    return (
+      <div onClick={e => e.stopPropagation()} style={{
+        position: "absolute", left: 0, top: 0, right: 0, bottom: 0, zIndex: 600,
+        background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <div style={{
+          background: "#0d1f0d", border: `1px solid ${COLORS.blue}`,
+          borderRadius: "10px", padding: "20px", minWidth: "320px", maxWidth: "400px",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.9)",
+        }}>
+          <div style={{ fontSize: "11px", color: COLORS.blue, letterSpacing: "2px", fontFamily: "'Cinzel', serif", marginBottom: "14px" }}>
+            LOOK AT TOP {scryN} — REORDER OR BOTTOM
+          </div>
+          <div style={{ fontSize: "11px", color: COLORS.textDim, fontFamily: "'Crimson Text', serif", marginBottom: "12px" }}>
+            Click ✕ to bottom a card. Use ↑↓ to reorder top cards.
+          </div>
+          {scryOrder.map((card, i) => {
+            const toBottom = scryBottom.has(i);
+            return (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px",
+                padding: "7px 10px", borderRadius: "6px",
+                background: toBottom ? "#1a0a0a" : "#0f1e0f",
+                border: `1px solid ${toBottom ? COLORS.red + "88" : COLORS.border}`,
+                opacity: toBottom ? 0.5 : 1,
+              }}>
+                <span style={{ flex: 1, fontSize: "12px", color: toBottom ? COLORS.textDim : COLORS.text, fontFamily: "'Crimson Text', serif", textDecoration: toBottom ? "line-through" : "none" }}>
+                  {i + 1}. {card}
+                  {CARDS[card] && <span style={{ fontSize: "10px", color: COLORS.textDim, marginLeft: "6px" }}>{CARDS[card].type}</span>}
+                </span>
+                {!toBottom && (
+                  <>
+                    <button onClick={() => scryMoveUp(i)} disabled={i === 0} style={{ ...btnStyle(COLORS.textDim), padding: "1px 6px", opacity: i === 0 ? 0.3 : 1 }}>↑</button>
+                    <button onClick={() => scryMoveDown(i)} disabled={i === scryOrder.filter((_,j) => !scryBottom.has(j)).length - 1} style={{ ...btnStyle(COLORS.textDim), padding: "1px 6px" }}>↓</button>
+                  </>
+                )}
+                <button onClick={() => scryToggleBottom(i)} style={{ ...btnStyle(toBottom ? COLORS.green1 : COLORS.red), padding: "1px 6px" }}>
+                  {toBottom ? "↑" : "✕"}
+                </button>
+              </div>
+            );
+          })}
+          <div style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
+            <button onClick={confirmScry} style={{
+              flex: 1, background: "#1a3a1a", border: `1px solid ${COLORS.green1}`, borderRadius: "6px",
+              padding: "8px", color: COLORS.green2, cursor: "pointer", fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
+            }}>✓ CONFIRM</button>
+            <button onClick={() => setShowScry(false)} style={{
+              background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "6px",
+              padding: "8px 14px", color: COLORS.textDim, cursor: "pointer", fontFamily: "'Cinzel', serif", fontSize: "11px",
+            }}>✕</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Tutor overlay ─────────────────────────────────────────────
+  const TutorOverlay = () => {
+    if (!showTutor) return null;
+    const q = tutorQuery.toLowerCase();
+    const matches = q.length >= 1 ? [...new Set(library)].filter(c => c.toLowerCase().includes(q)).slice(0, 15) : [];
+    return (
+      <div style={{
+        position: "absolute", left: 0, top: 0, zIndex: 500,
+        background: "#0d1f0d", border: `1px solid ${COLORS.purple}`,
+        borderRadius: "8px", padding: "12px", boxShadow: "0 4px 24px rgba(0,0,0,0.9)",
+        margin: "8px", width: "calc(100% - 16px)",
+      }}>
+        <div style={{ fontSize: "10px", color: COLORS.purple, letterSpacing: "2px", fontFamily: "'Cinzel', serif", marginBottom: "8px" }}>
+          TUTOR — SEARCH LIBRARY ({library.length} cards)
+        </div>
+        <input ref={tutorInputRef} value={tutorQuery} onChange={e => setTutorQuery(e.target.value)}
+          onKeyDown={e => { if (e.key === "Escape") { setShowTutor(false); setTutorQuery(""); } if (e.key === "Enter" && matches.length === 1) tutorCard(matches[0]); }}
+          placeholder="Type card name..." style={{
+            width: "100%", background: "#0a150a", border: `1px solid ${COLORS.border}`,
+            borderRadius: "6px", padding: "6px 10px", color: COLORS.text,
+            fontFamily: "'Crimson Text', serif", fontSize: "13px", outline: "none", marginBottom: "8px",
+          }} />
+        {matches.length === 0 && tutorQuery.length >= 1 && <div style={{ fontSize: "11px", color: COLORS.textDim, fontStyle: "italic", fontFamily: "'Crimson Text', serif" }}>No matches in library.</div>}
+        {matches.map((card, i) => (
+          <div key={i} onClick={() => tutorCard(card)} style={{ padding: "6px 10px", cursor: "pointer", borderRadius: "4px", fontSize: "12px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", marginBottom: "2px" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#1a3a1a"; e.currentTarget.style.color = COLORS.green2; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = COLORS.textMid; }}>
+            {card}{CARDS[card] && <span style={{ fontSize: "10px", color: COLORS.textDim, marginLeft: "8px" }}>{CARDS[card].type}</span>}
+          </div>
+        ))}
+        <button onClick={() => { setShowTutor(false); setTutorQuery(""); }} style={{
+          marginTop: "8px", background: "none", border: `1px solid ${COLORS.border}`,
+          borderRadius: "6px", padding: "4px 12px", color: COLORS.textDim, cursor: "pointer",
+          fontFamily: "'Cinzel', serif", fontSize: "10px", letterSpacing: "1px", width: "100%",
+        }}>✕ CANCEL (Esc)</button>
+      </div>
+    );
+  };
+
+  // ── render ──────────────────────────────────────────────────
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1000,
+      background: "rgba(0,0,0,0.85)", display: "flex",
+      alignItems: "stretch", justifyContent: "center",
+      padding: "12px",
+    }} onClick={onClose}>
+      <div style={{
+        background: COLORS.bg, border: `1px solid ${COLORS.borderBright}`,
+        borderRadius: "12px", width: "100%", maxWidth: "1400px",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+      }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}`,
+          flexShrink: 0,
+        }}>
+          <div>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: "14px", color: COLORS.green3, letterSpacing: "2px" }}>
+              🐟 GOLDFISH MODE
+            </div>
+            {activeDeck && (
+              <div style={{ fontSize: "11px", color: COLORS.textDim, marginTop: "2px", fontFamily: "'Crimson Text', serif" }}>
+                {activeDeck.name} · {deckCards.length} cards
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {phase === "playing" && (
+              <>
+                <div style={{ padding: "4px 12px", background: "#1a2e1a", border: `1px solid ${COLORS.border}`, borderRadius: "6px", fontSize: "11px", color: COLORS.textMid, fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>
+                  Turn {turnNumber} · {isMyTurn ? "Your Turn" : "Opp Turn"}
+                </div>
+                <div style={{ padding: "4px 12px", background: "#0f1e0f", border: `1px solid ${COLORS.border}`, borderRadius: "6px", fontSize: "11px", color: COLORS.textDim, fontFamily: "'Cinzel', serif" }}>
+                  {library.length} in library
+                </div>
+                <button onClick={nextTurn} style={{
+                  background: "#1a3a1a", border: `1px solid ${COLORS.green1}`, borderRadius: "6px",
+                  padding: "5px 14px", color: COLORS.green2, cursor: "pointer",
+                  fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
+                }}
+                  onMouseEnter={e => { e.target.style.background = "#1f4a1f"; }}
+                  onMouseLeave={e => { e.target.style.background = "#1a3a1a"; }}
+                >▶ NEXT TURN + DRAW</button>
+                <button onClick={exportToAdvisor} style={{
+                  background: "none", border: `1px solid ${COLORS.blue}`, borderRadius: "6px",
+                  padding: "5px 12px", color: COLORS.blue, cursor: "pointer",
+                  fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
+                }}
+                  onMouseEnter={e => { e.target.style.background = "#0a1a2e"; }}
+                  onMouseLeave={e => { e.target.style.background = "transparent"; }}
+                  title="Send this board state to the main advisor"
+                >↗ EXPORT TO ADVISOR</button>
+              </>
+            )}
+            {phase === "playing" && (
+              <button onClick={() => setPhase("setup")} style={{
+                background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "6px",
+                padding: "5px 10px", color: COLORS.textDim, cursor: "pointer",
+                fontFamily: "'Cinzel', serif", fontSize: "11px",
+              }}
+                onMouseEnter={e => { e.target.style.borderColor = COLORS.red; e.target.style.color = COLORS.red; }}
+                onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
+              >↺ NEW GAME</button>
+            )}
+            <button onClick={onClose} style={{
+              background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "6px",
+              padding: "5px 10px", color: COLORS.textDim, cursor: "pointer",
+              fontFamily: "'Cinzel', serif", fontSize: "13px",
+            }}>✕</button>
+          </div>
+        </div>
+
+        {/* Body */}
+        {phase === "setup" && (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px" }}>
+            <div style={{ textAlign: "center", maxWidth: "420px" }}>
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>🐟</div>
+              <div style={{ fontFamily: "'Cinzel', serif", fontSize: "16px", color: COLORS.green3, letterSpacing: "2px", marginBottom: "12px" }}>
+                GOLDFISH MODE
+              </div>
+              <div style={{ fontSize: "14px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", lineHeight: 1.6, marginBottom: "28px" }}>
+                {hasDeck
+                  ? <>Shuffle and deal from <strong style={{ color: COLORS.text }}>{activeDeck.name}</strong> ({deckCards.length} cards). Draw an opening hand, manage mulligans, play through turns, and get real-time advisor guidance each turn.</>
+                  : <>No deck loaded. Load a deck from the main screen first, then return here to goldfish.</>
+                }
+              </div>
+              {hasDeck && (
+                <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                  <button onClick={() => startGame()} style={{
+                    background: "#1a3a1a", border: `1px solid ${COLORS.green1}`,
+                    borderRadius: "8px", padding: "10px 28px", color: COLORS.green2,
+                    cursor: "pointer", fontFamily: "'Cinzel', serif", fontSize: "13px", letterSpacing: "1px",
+                  }}
+                    onMouseEnter={e => { e.target.style.background = "#1f4a1f"; }}
+                    onMouseLeave={e => { e.target.style.background = "#1a3a1a"; }}
+                  >🂠 DEAL OPENING HAND</button>
+                </div>
+              )}
+              {!hasDeck && (
+                <button onClick={onClose} style={{
+                  background: "none", border: `1px solid ${COLORS.border}`,
+                  borderRadius: "8px", padding: "10px 24px", color: COLORS.textDim,
+                  cursor: "pointer", fontFamily: "'Cinzel', serif", fontSize: "12px", letterSpacing: "1px",
+                }}>← BACK</button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {phase === "mulligan" && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "24px 28px", overflow: "auto" }}>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: "12px", color: COLORS.gold, letterSpacing: "2px", marginBottom: "20px" }}>
+              OPENING HAND {mulliganCount > 0 ? `(Mulligan #${mulliganCount})` : ""} · {hand.length} CARDS
+              {phase2 === "bottoming" && (
+                <span style={{ marginLeft: "16px", color: COLORS.textDim, fontSize: "11px" }}>
+                  — click cards to send to bottom
+                </span>
+              )}
+            </div>
+
+            {/* Card image row */}
+            <div style={{
+              display: "flex", gap: "12px", flexWrap: "wrap",
+              marginBottom: "32px", alignItems: "flex-end", minHeight: "220px",
+              padding: "12px 4px",
+            }}>
+              {hand.map((card, i) => {
+                const key = `${card}:${i}`;
+                const toBottom = pendingBottoms.includes(key);
+                return (
+                  <MulliganCard
+                    key={`${card}-${i}`}
+                    card={card}
+                    toBottom={toBottom}
+                    selectable={phase2 === "bottoming"}
+                    onClick={() => phase2 === "bottoming" && toggleBottom(card, i)}
+                  />
+                );
+              })}
+            </div>
+
+            {phase2 === "bottoming" && (
+              <div style={{ marginBottom: "16px", padding: "12px 16px", background: "#1a1a0a", border: `1px solid ${COLORS.gold}`, borderRadius: "8px", fontSize: "12px", color: COLORS.gold, fontFamily: "'Cinzel', serif", letterSpacing: "1px", display: "flex", alignItems: "center", gap: "16px" }}>
+                <span>{Math.max(0, mulliganCount - 1) - pendingBottoms.length > 0
+                  ? `Choose ${Math.max(0, mulliganCount - 1) - pendingBottoms.length} more card${Math.max(0, mulliganCount - 1) - pendingBottoms.length !== 1 ? "s" : ""} to bottom.`
+                  : "All cards selected."
+                }</span>
+                {pendingBottoms.length === Math.max(0, mulliganCount - 1) && (
+                  <button onClick={confirmBottom} style={{
+                    background: "#1a1a0a", border: `1px solid ${COLORS.gold}`,
+                    borderRadius: "6px", padding: "4px 16px", color: COLORS.gold, cursor: "pointer",
+                    fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
+                  }}>✓ CONFIRM</button>
+                )}
+              </div>
+            )}
+
+            {phase2 !== "bottoming" && (
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                <button onClick={keepHand} style={{
+                  background: "#1a3a1a", border: `1px solid ${COLORS.green1}`, borderRadius: "8px",
+                  padding: "10px 28px", color: COLORS.green2, cursor: "pointer",
+                  fontFamily: "'Cinzel', serif", fontSize: "13px", letterSpacing: "1px",
+                }}
+                  onMouseEnter={e => { e.target.style.background = "#1f4a1f"; }}
+                  onMouseLeave={e => { e.target.style.background = "#1a3a1a"; }}
+                >✓ KEEP</button>
+                {hand.length > 0 && (
+                  <button onClick={doMulligan} style={{
+                    background: "none", border: `1px solid ${COLORS.gold}`, borderRadius: "8px",
+                    padding: "10px 24px", color: COLORS.gold, cursor: "pointer",
+                    fontFamily: "'Cinzel', serif", fontSize: "13px", letterSpacing: "1px",
+                  }}
+                    onMouseEnter={e => { e.target.style.background = "#1a1a0a"; }}
+                    onMouseLeave={e => { e.target.style.background = "transparent"; }}
+                  >↺ MULLIGAN TO {Math.max(0, 7 - mulliganCount)}</button>
+                )}
+                <button onClick={() => setPhase("setup")} style={{
+                  background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "8px",
+                  padding: "10px 20px", color: COLORS.textDim, cursor: "pointer",
+                  fontFamily: "'Cinzel', serif", fontSize: "13px",
+                }}>✕ ABANDON</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {phase === "playing" && (
+          <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0 }}>
+
+            {/* LEFT: zones */}
+            <div style={{
+              width: "330px", flexShrink: 0, borderRight: `1px solid ${COLORS.border}`,
+              display: "flex", flexDirection: "column", overflow: "hidden",
+              position: "relative",
+            }}>
+              {/* Controls strip */}
+              <div style={{ padding: "8px 12px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", gap: "5px", flexWrap: "wrap", alignItems: "center" }}>
+                <button onClick={() => drawCard(1)} style={btnStyle(COLORS.green1)}>+ DRAW 1</button>
+                <button onClick={() => drawCard(3)} style={btnStyle(COLORS.border)}>+ DRAW 3</button>
+                <button onClick={untapAll} style={btnStyle(COLORS.green2)} title="Untap all permanents">↺ UNTAP ALL</button>
+                <button onClick={openTutor} style={btnStyle(COLORS.purple)} title="Search library">🔍 TUTOR</button>
+                <button onClick={() => openScry(3)} style={btnStyle(COLORS.blue)} title="Look at top 3">👁 SCRY 3</button>
+                <button onClick={() => openScry(1)} style={btnStyle(COLORS.border)} title="Scry 1">👁 1</button>
+                <button onClick={castYeva}
+                  disabled={battlefield.includes("Yeva, Nature's Herald")}
+                  title={`Cast Yeva from command zone (${4 + yevaTax} mana)`}
+                  style={{
+                    ...btnStyle(battlefield.includes("Yeva, Nature's Herald") ? COLORS.border : COLORS.green1),
+                    background: battlefield.includes("Yeva, Nature's Herald") ? "transparent" : "#1a3a1a",
+                    opacity: battlefield.includes("Yeva, Nature's Herald") ? 0.4 : 1,
+                  }}>🌿 YEVA{yevaTax > 0 ? ` (+${yevaTax})` : ""}</button>
+              </div>
+
+              {/* Land drop indicator */}
+              <div style={{ padding: "5px 12px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", gap: "8px", alignItems: "center" }}>
+                <span style={{ fontSize: "10px", color: landPlayed ? COLORS.textDim : COLORS.green1, fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>
+                  {landPlayed ? "🟫 LAND PLAYED" : "🟩 LAND AVAILABLE"}
+                </span>
+                {landPlayed && (
+                  <button onClick={() => setLandPlayed(false)} style={{ ...btnStyle(COLORS.border), padding: "1px 7px", fontSize: "9px" }}>reset</button>
+                )}
+              </div>
+
+              {/* Tutor / Scry overlays — called as functions to avoid remount */}
+              {TutorOverlay()}
+              {ScryModal()}
+
+              <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}>
+                {/* HAND — click to cast */}
+                <div style={{ marginBottom: "16px" }}>
+                  {zoneLabel("HAND — click to cast", hand.length, COLORS.green2)}
+                  <div style={{ minHeight: "32px" }}>
+                    {hand.length === 0
+                      ? <span style={{ fontSize: "11px", color: COLORS.textDim, fontStyle: "italic" }}>Empty</span>
+                      : hand.map((card, i) => {
+                          const isLand = CARDS[card]?.type === "land";
+                          const cantPlay = isLand && landPlayed;
+                          return renderCard(card, i, "hand", {
+                            onClick: () => !cantPlay && castFromHand(card, i),
+                            style: {
+                              cursor: cantPlay ? "not-allowed" : "pointer",
+                              opacity: cantPlay ? 0.4 : 1,
+                              borderColor: isLand ? "#3a5a2a" : isFetch(card) ? COLORS.blue + "88" : COLORS.border,
+                              color: isLand ? COLORS.green3 : COLORS.textMid,
+                            },
+                          });
+                        })
+                    }
+                  </div>
+                </div>
+
+                {/* BATTLEFIELD — click to tap/untap */}
+                <div style={{ marginBottom: "16px" }}>
+                  {zoneLabel("BATTLEFIELD — click to tap", battlefield.length, COLORS.green3)}
+                  <div style={{ minHeight: "32px" }}>
+                    {battlefield.length === 0
+                      ? <span style={{ fontSize: "11px", color: COLORS.textDim, fontStyle: "italic" }}>Empty</span>
+                      : battlefield.map((card, i) => {
+                          const key = cardKey(card, i);
+                          return renderCard(card, i, "battlefield", {
+                            isTap: tapped.has(key),
+                            curCount: counters[key] ?? 0,
+                            onClick: () => toggleTap(card, i),
+                            style: { cursor: "pointer" },
+                          });
+                        })
+                    }
+                  </div>
+                </div>
+
+                {/* GRAVEYARD */}
+                <div style={{ marginBottom: "14px" }}>
+                  {zoneLabel("GRAVEYARD", graveyard.length, COLORS.textDim)}
+                  <div style={{ minHeight: "24px" }}>
+                    {graveyard.length === 0
+                      ? <span style={{ fontSize: "11px", color: COLORS.textDim, fontStyle: "italic" }}>Empty</span>
+                      : graveyard.map((card, i) => renderCard(card, i, "graveyard", {
+                          style: { opacity: 0.55, cursor: "context-menu" },
+                        }))
+                    }
+                  </div>
+                </div>
+
+                {/* EXILE */}
+                {exile.length > 0 && (
+                  <div style={{ marginBottom: "14px" }}>
+                    {zoneLabel("EXILE", exile.length, COLORS.textDim)}
+                    <div>
+                      {exile.map((card, i) => renderCard(card, i, "exile", {
+                        style: { opacity: 0.4, cursor: "context-menu" },
+                      }))}
+                    </div>
+                  </div>
+                )}
+
+                {/* LIBRARY TOP */}
+                <div>
+                  {zoneLabel("LIBRARY TOP", library.length, COLORS.textDim)}
+                  <div style={{ minHeight: "24px" }}>
+                    {library.slice(0, 3).map((card, i) => renderCard(card, i, "library", {
+                      style: { opacity: 0.45, fontSize: "10px", cursor: "context-menu" },
+                    }))}
+                    {library.length > 3 && <span style={{ fontSize: "10px", color: COLORS.textDim, marginLeft: "4px" }}>+{library.length - 3} more</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* MIDDLE: advisor */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+              <div style={{
+                padding: "10px 16px", borderBottom: `1px solid ${COLORS.border}`,
+                fontSize: "10px", color: COLORS.textDim, letterSpacing: "2px",
+                fontFamily: "'Cinzel', serif", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <span>ADVISOR · TURN {turnNumber}</span>
+                {analysis?.infiniteManaActive && (
+                  <span style={{ color: "#c084fc", letterSpacing: "1px", fontSize: "10px" }}>⚡ ∞ INFINITE MANA</span>
+                )}
+              </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}>
+                {(!analysis || (hand.length + battlefield.length === 0)) ? (
+                  <div style={{ color: COLORS.textDim, fontSize: "13px", fontFamily: "'Crimson Text', serif", padding: "20px", textAlign: "center" }}>
+                    Play some cards to see advice.
+                  </div>
+                ) : (
+                  analysis.results.slice(0, 12).map((a, i) => (
+                    <div key={i} style={{
+                      background: COLORS.bgCard, border: `1px solid ${a.color ? a.color + "44" : COLORS.border}`,
+                      borderLeft: `3px solid ${a.color || COLORS.green1}`,
+                      borderRadius: "6px", padding: "10px 12px", marginBottom: "8px",
+                    }}>
+                      <div style={{ fontSize: "10px", color: a.color || COLORS.green1, letterSpacing: "1.5px", fontFamily: "'Cinzel', serif", marginBottom: "4px" }}>
+                        {a.category}
+                      </div>
+                      <div style={{ fontSize: "12px", color: COLORS.text, fontFamily: "'Crimson Text', serif", lineHeight: 1.5 }}>
+                        {a.headline}
+                      </div>
+                      {a.steps && a.steps.length > 0 && (
+                        <div style={{ marginTop: "8px", borderTop: `1px solid ${COLORS.border}`, paddingTop: "8px" }}>
+                          {a.steps.slice(0, 4).map((s, j) => (
+                            <div key={j} style={{ fontSize: "11px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", marginBottom: "3px", paddingLeft: "10px", borderLeft: `1px solid ${COLORS.border}` }}>
+                              {j + 1}. {s}
+                            </div>
+                          ))}
+                          {a.steps.length > 4 && (
+                            <div style={{ fontSize: "10px", color: COLORS.textDim, paddingLeft: "10px", marginTop: "2px" }}>
+                              +{a.steps.length - 4} more steps…
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT: log */}
+            <div style={{
+              width: "240px", flexShrink: 0, borderLeft: `1px solid ${COLORS.border}`,
+              display: "flex", flexDirection: "column", overflow: "hidden",
+            }}>
+              <div style={{ padding: "10px 14px", borderBottom: `1px solid ${COLORS.border}`, fontSize: "10px", color: COLORS.textDim, letterSpacing: "2px", fontFamily: "'Cinzel', serif", flexShrink: 0 }}>
+                GAME LOG
+              </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px" }}>
+                {log.map((entry, i) => (
+                  <div key={i} style={{ fontSize: "11px", color: entry.color, fontFamily: "'Crimson Text', serif", marginBottom: "5px", lineHeight: 1.4, opacity: i > 20 ? Math.max(0.3, 1 - (i - 20) * 0.03) : 1 }}>
+                    {entry.turn && <span style={{ color: COLORS.textDim, fontSize: "9px", marginRight: "4px" }}>T{entry.turn}</span>}
+                    {entry.msg}
+                  </div>
+                ))}
+                {log.length === 0 && (
+                  <div style={{ fontSize: "11px", color: COLORS.textDim, fontStyle: "italic" }}>No actions yet.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {ContextMenuPopup()}
+      </div>
+    </div>
+  );
+}
+
 function SynergyMapModal({ onClose }) {
   const containerRef = useRef(null);
   const outerRef     = useRef(null);  // stable ref always in DOM for ResizeObserver
@@ -7792,6 +8836,7 @@ function YevaAdvisor() {
   const { decks, activeDeckId, saveDecks, saveActiveDeck } = useDeckStorage();
   const [showDeckManager, setShowDeckManager] = useState(false);
   const [showSynergyMap, setShowSynergyMap]   = useState(false);
+  const [showGoldfish, setShowGoldfish]       = useState(false);
   const tour = useTour();
 
   // Compute the active deck's card set for filtering
@@ -7841,6 +8886,7 @@ function YevaAdvisor() {
         setShowSavedStates(false);
         setShowDebug(false);
         setShowDeckManager(false);
+        setShowGoldfish(false);
       }
       // Tab = cycle focus between zone inputs (only when not in an input, or at end of suggestions)
       if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
@@ -7962,6 +9008,9 @@ function YevaAdvisor() {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.65; }
         }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
         @media (max-width: 768px) {
           .panels-wrapper { flex-direction: column; min-height: unset; }
           .panel-input {
@@ -8068,6 +9117,16 @@ function YevaAdvisor() {
               onMouseEnter={e => { e.target.style.borderColor = "#a569bd"; e.target.style.color = "#a569bd"; }}
               onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
             >⬡ SYNERGY</button>
+            <button onClick={() => setShowGoldfish(true)} style={{
+              background: "none", border: `1px solid ${COLORS.border}`,
+              borderRadius: "6px", padding: "5px 14px",
+              color: COLORS.textDim, cursor: "pointer",
+              fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
+              transition: "all 0.2s",
+            }}
+              onMouseEnter={e => { e.target.style.borderColor = COLORS.green2; e.target.style.color = COLORS.green2; }}
+              onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
+            >🐟 GOLDFISH</button>
             <button onClick={() => setShowDebug(true)} style={{
               background: "none", border: `1px solid ${COLORS.border}`,
               borderRadius: "6px", padding: "5px 14px",
@@ -8114,6 +9173,21 @@ function YevaAdvisor() {
 
           {/* SYNERGY MAP MODAL */}
           {showSynergyMap && <SynergyMapModal onClose={() => setShowSynergyMap(false)} />}
+          {/* GOLDFISH MODAL */}
+          {showGoldfish && (
+            <GoldfishModal
+              activeDeck={activeDeck}
+              onClose={() => setShowGoldfish(false)}
+              onLoadState={(s) => {
+                if (s.hand)        setHand(s.hand);
+                if (s.battlefield) setBattlefield(s.battlefield);
+                if (s.graveyard)   setGraveyard(s.graveyard);
+                if (s.mana != null) setMana(String(s.mana));
+                if (s.isMyTurn != null) setIsMyTurn(s.isMyTurn);
+                setShowGoldfish(false);
+              }}
+            />
+          )}
           {/* TOUR OVERLAY */}
           <TourOverlay active={tour.active} step={tour.step} next={tour.next} prev={tour.prev} skip={tour.skip} total={tour.total} />
           {/* SAVED STATES MODAL */}
