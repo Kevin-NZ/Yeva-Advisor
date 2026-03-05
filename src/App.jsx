@@ -1152,7 +1152,7 @@ function calculateBattlefieldMana(battlefield) {
 
   let total = 0;
   for (const card of battlefield) {
-    const data = CARDS[card];
+    const data = CARDS[card] ?? EXTRA_CARDS.get(card);
     if (!data) continue;
     if (data.type === "land") {
       if (card === "Gaea's Cradle" || card === "Itlimoc, Cradle of the Sun") {
@@ -5336,7 +5336,7 @@ const TOUR_STEPS = [
   {
     target: "tour-deck",
     title: "Optional: Load a Deck",
-    body: "Click the 📦 DECKS button to load your decklist. When active, autocomplete only shows cards in your deck, and advice is filtered to cards you actually run. Use the preset 'Yeva Competitive' deck to get started immediately.",
+    body: "Click the 📦 DECKS button to load your decklist. When active, autocomplete only shows cards in your deck, and advice is filtered to cards you actually run. Use the preset 'Competitive' deck to get started immediately.",
     placement: "bottom",
     icon: "📦",
   },
@@ -5610,6 +5610,122 @@ function Tag({ label, color }) {
 
 // ── Scryfall image cache (module-level, persists across renders) ──────────────
 const scryfallCache = new Map(); // cardName → image URL or "error"
+
+// ── Runtime card data for unknown cards fetched from Scryfall ─────────────────
+// Merged into CARDS lookups via getCard(name) helper below.
+const EXTRA_CARDS = new Map(); // cardName → {type, cmc, tags, tapsFor, devotion}
+
+// Persistent cache in localStorage so we don't re-fetch every session
+const SCRYFALL_DATA_CACHE_KEY = "yeva_scryfall_data_v1";
+function loadScryfallDataCache() {
+  try { return JSON.parse(localStorage.getItem(SCRYFALL_DATA_CACHE_KEY) || "{}"); }
+  catch { return {}; }
+}
+function saveScryfallDataCache(cache) {
+  try { localStorage.setItem(SCRYFALL_DATA_CACHE_KEY, JSON.stringify(cache)); } catch {}
+}
+
+// Seed EXTRA_CARDS from localStorage on module load
+(function seedExtraCards() {
+  const cache = loadScryfallDataCache();
+  for (const [name, data] of Object.entries(cache)) {
+    if (!CARDS[name]) EXTRA_CARDS.set(name, data);
+  }
+})();
+
+// Derive a minimal card entry from Scryfall API card data
+function deriveCardEntry(sf) {
+  const typeLine = (sf.type_line || "").toLowerCase();
+  const oracle   = (sf.oracle_text || sf.card_faces?.[0]?.oracle_text || "").toLowerCase();
+  const cmc      = sf.cmc ?? 0;
+
+  // Type
+  let type = "unknown";
+  if (typeLine.includes("creature"))    type = "creature";
+  else if (typeLine.includes("land"))   type = "land";
+  else if (typeLine.includes("instant")) type = "instant";
+  else if (typeLine.includes("sorcery")) type = "sorcery";
+  else if (typeLine.includes("enchantment")) type = "enchantment";
+  else if (typeLine.includes("artifact"))    type = "artifact";
+  else if (typeLine.includes("planeswalker")) type = "planeswalker";
+
+  // Tags — best-effort from oracle text
+  const tags = [];
+  if (type === "land") tags.push("land");
+  if (typeLine.includes("basic")) tags.push("basic");
+  if (typeLine.includes("forest") || oracle.includes("add {g}") || oracle.includes("add one mana of any color")) {
+    if (!tags.includes("forest")) tags.push("forest");
+  }
+  if (typeLine.includes("elf"))   tags.push("elf");
+  if (typeLine.includes("human")) tags.push("human");
+  if (type === "creature" && (oracle.includes("{t}: add") || oracle.includes("tap: add"))) {
+    tags.push("dork");
+    if (cmc <= 1) tags.push("1drop");
+  }
+  if (oracle.includes("search your library") || oracle.includes("tutor")) tags.push("tutor");
+  if (oracle.includes("draw a card") || oracle.includes("draw cards")) tags.push("draw");
+  if (oracle.includes("untap")) tags.push("untap");
+  if (oracle.includes("fetch") || (type === "land" && oracle.includes("search your library for a"))) tags.push("fetch");
+  if (typeLine.includes("legendary") && type === "creature") tags.push("legendary");
+
+  // tapsFor heuristic for dorks
+  let tapsFor;
+  if (tags.includes("dork")) {
+    if (oracle.includes("add mana equal") || oracle.includes("for each")) tapsFor = "creatures";
+    else if (oracle.includes("add {g} for each elf")) tapsFor = "elves";
+    else tapsFor = 1;
+  }
+
+  // devotion: count coloured mana pips in mana cost
+  const cost = sf.mana_cost || "";
+  const devotion = (cost.match(/\{G\}/g) || []).length +
+                   (cost.match(/\{[WUBR]\}/g) || []).length;
+
+  return { type, cmc, tags, tapsFor, devotion };
+}
+
+// Enrich a list of unknown card names via Scryfall — returns a map of name→entry
+// Updates EXTRA_CARDS in place and persists to localStorage.
+// Returns { enriched: Set, failed: Set }
+async function enrichUnknownCards(names) {
+  const enriched = new Set();
+  const failed   = new Set();
+  const toFetch  = names.filter(n => !CARDS[n] && !EXTRA_CARDS.has(n));
+  if (toFetch.length === 0) return { enriched, failed };
+
+  const cache = loadScryfallDataCache();
+
+  for (const name of toFetch) {
+    // Small delay to respect Scryfall rate limit (50–100ms between requests)
+    await new Promise(r => setTimeout(r, 80));
+    try {
+      const url = `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`;
+      const resp = await fetch(url);
+      if (!resp.ok) { failed.add(name); continue; }
+      const sf = await resp.json();
+      if (sf.object === "error") { failed.add(name); continue; }
+      // Use canonical Scryfall name as the key
+      const canonical = sf.name || name;
+      const entry = deriveCardEntry(sf);
+      EXTRA_CARDS.set(canonical, entry);
+      // Also map original name if different (fuzzy matched)
+      if (canonical !== name) EXTRA_CARDS.set(name, entry);
+      cache[canonical] = entry;
+      if (canonical !== name) cache[name] = entry;
+      enriched.add(name);
+    } catch {
+      failed.add(name);
+    }
+  }
+
+  saveScryfallDataCache(cache);
+  return { enriched, failed };
+}
+
+// Helper: look up a card from CARDS or EXTRA_CARDS
+function getCard(name) {
+  return CARDS[name] ?? EXTRA_CARDS.get(name) ?? null;
+}
 
 function useScryfallImage(name) {
   const [url, setUrl] = useState(() => scryfallCache.get(name) || null);
@@ -6378,7 +6494,7 @@ function QuickAdd({ zone, onAdd, deckCards }) {
 const PRESET_DECKS = [
   {
     id: "yeva-competitive",
-    name: "Yeva Competitive",
+    name: "Competitive",
     cards: [
       "Allosaurus Shepherd","Ancient Tomb","Arbor Elf","Archdruid's Charm",
       "Argothian Elder","Ashaya, Soul of the Wild","Badgermole Cub","Beast Whisperer",
@@ -6503,11 +6619,10 @@ function parseDecklist(text) {
     const name = match ? match[2].trim() : line;
     const qty  = match ? parseInt(match[1]) : 1;
     // Resolve aliases
-    const resolved = CARD_ALIASES[name.toLowerCase()] || name;
-    // Only include cards we know about (or keep unknown ones for custom lists)
+    const resolved = CARD_ALIASES.get(name.toLowerCase()) || name;
     for (let i = 0; i < Math.min(qty, 99); i++) cards.push(resolved);
   }
-  return [...new Set(cards)]; // deduplicate (deck lists each card once)
+  return cards;
 }
 
 function DeckCardChip({ name, count, isUnknown, note, onRemove, onNoteChange, editMode }) {
@@ -6615,7 +6730,7 @@ function DeckDetailModal({ deck, onClose, onSave }) {
   });
 
   const q = filter.toLowerCase();
-  const unknown = cards.filter(c => c !== "Forest" && !CARDS[c]);
+  const unknown = cards.filter(c => c !== "Forest" && !CARDS[c] && !EXTRA_CARDS.has(c));
 
   const handleRemove = (name) => {
     const idx = cards.lastIndexOf(name);
@@ -6740,7 +6855,7 @@ function DeckDetailModal({ deck, onClose, onSave }) {
                   {filtered.sort().map(c => (
                     <DeckCardChip
                       key={c} name={c} count={counts[c]}
-                      isUnknown={c !== "Forest" && !CARDS[c]}
+                      isUnknown={c !== "Forest" && !CARDS[c] && !EXTRA_CARDS.has(c)}
                       note={notes[c]}
                       editMode={editMode}
                       onRemove={editMode ? handleRemove : null}
@@ -6912,6 +7027,26 @@ function DeckManager({ decks, activeDeckId, onSaveDecks, onSetActive, onClose })
   const [importName, setImportName]     = useState("");
   const [importError, setImportError]   = useState("");
   const [saveStatus, setSaveStatus]     = useState(""); // "" | "saving" | "saved" | "error"
+  // Scryfall enrichment: deckId → "idle"|"fetching"|"done"|"partial"|"failed"
+  const [enrichStatus, setEnrichStatus] = useState({});
+  const [, forceEnrichUpdate] = useState(0);
+
+  // Auto-enrich any deck that has unknown cards not yet in EXTRA_CARDS
+  useEffect(() => {
+    for (const deck of (decks || [])) {
+      const unknowns = deck.cards.filter(c => !CARDS[c] && !EXTRA_CARDS.has(c));
+      if (unknowns.length === 0) continue;
+      if (enrichStatus[deck.id] === "fetching") continue;
+      setEnrichStatus(prev => ({ ...prev, [deck.id]: "fetching" }));
+      enrichUnknownCards([...new Set(unknowns)]).then(({ enriched, failed }) => {
+        const status = failed.size === 0 ? "done"
+          : enriched.size === 0 ? "failed" : "partial";
+        setEnrichStatus(prev => ({ ...prev, [deck.id]: status }));
+        forceEnrichUpdate(n => n + 1); // re-render to pick up new EXTRA_CARDS entries
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decks]);
 
   const deleteDeck = (id) => {
     onSaveDecks((decks || []).filter(d => d.id !== id));
@@ -7028,8 +7163,36 @@ function DeckManager({ decks, activeDeckId, onSaveDecks, onSetActive, onClose })
               {activeDeckId === null && <span style={{ color: COLORS.green1 }}>✓</span>}
             </div>
 
-            {(decks || []).map(deck => {
-              const unknown = deck.cards.filter(c => c !== "Forest" && !CARDS[c]).length;
+            {/* Built-in decks — always visible */}
+            {PRESET_DECKS.map(deck => {
+              const isActive = activeDeckId === deck.id;
+              return (
+              <div key={deck.id} style={{
+                padding: "10px 14px", borderRadius: "6px", marginBottom: "8px",
+                background: isActive ? "#1a3a1a" : "#0a150a",
+                border: `1px solid ${isActive ? COLORS.green1 : COLORS.border}`,
+                display: "flex", alignItems: "center", gap: "10px",
+              }}>
+                <div onClick={() => { onSetActive(deck.id); onClose(); }} style={{ flex: 1, display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <span style={{ fontSize: "16px" }}>⭐</span>
+                  <div>
+                    <div style={{ fontFamily: "'Cinzel', serif", fontSize: "12px", color: isActive ? COLORS.text : COLORS.textMid }}>{deck.name}</div>
+                    <div style={{ fontSize: "11px", color: COLORS.textDim }}>{deck.cards.length} cards · built-in</div>
+                  </div>
+                  {isActive && <span style={{ color: COLORS.green1 }}>✓</span>}
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); setViewingDeck(deck); }} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "4px", padding: "3px 8px", color: COLORS.textDim, cursor: "pointer", fontSize: "11px" }}>👁</button>
+              </div>
+            )})}
+
+            {/* User decks */}
+            {(decks || []).filter(d => !PRESET_DECKS.some(p => p.id === d.id)).length > 0 && (
+              <div style={{ fontSize: "9px", color: COLORS.textDim, fontFamily: "'Cinzel', serif", letterSpacing: "1.5px", marginBottom: "6px", marginTop: "4px" }}>MY DECKS</div>
+            )}
+            {(decks || []).filter(d => !PRESET_DECKS.some(p => p.id === d.id)).map(deck => {
+              const unknownCards = deck.cards.filter(c => !CARDS[c] && !EXTRA_CARDS.has(c));
+              const enrichedCards = deck.cards.filter(c => !CARDS[c] && EXTRA_CARDS.has(c));
+              const es = enrichStatus[deck.id];
               return (
               <div key={deck.id} style={{
                 padding: "10px 14px", borderRadius: "6px",
@@ -7044,7 +7207,21 @@ function DeckManager({ decks, activeDeckId, onSaveDecks, onSetActive, onClose })
                     <div style={{ fontFamily: "'Cinzel', serif", fontSize: "12px", color: activeDeckId === deck.id ? COLORS.text : COLORS.textMid }}>{deck.name}</div>
                     <div style={{ fontSize: "11px", color: COLORS.textDim }}>
                       {deck.cards.length} cards
-                      {unknown > 0 && <span style={{ color: "#e74c3c", marginLeft: "6px" }}>· {unknown} unknown</span>}
+                      {es === "fetching" && (
+                        <span style={{ color: COLORS.blue, marginLeft: "6px" }}>· ⏳ looking up {unknownCards.length} unknown…</span>
+                      )}
+                      {(es === "done") && enrichedCards.length > 0 && (
+                        <span style={{ color: COLORS.green2, marginLeft: "6px" }}>· ✓ {enrichedCards.length} enriched via Scryfall</span>
+                      )}
+                      {es === "partial" && (
+                        <span style={{ color: COLORS.gold, marginLeft: "6px" }}>· ⚠ {enrichedCards.length} enriched, {unknownCards.length} not found</span>
+                      )}
+                      {es === "failed" && unknownCards.length > 0 && (
+                        <span style={{ color: "#e74c3c", marginLeft: "6px" }}>· ✕ {unknownCards.length} unknown (Scryfall unavailable)</span>
+                      )}
+                      {!es && unknownCards.length > 0 && (
+                        <span style={{ color: "#e74c3c", marginLeft: "6px" }}>· {unknownCards.length} unknown</span>
+                      )}
                     </div>
                   </div>
                   {activeDeckId === deck.id && <span style={{ color: COLORS.green1 }}>✓</span>}
@@ -7247,8 +7424,9 @@ function shuffleArray(arr) {
 
 // Expand deck cards array: basics appear multiple times, non-basics once
 function buildLibrary(deckCards) {
-  // deckCards already has repeated basics (e.g. 10x "Forest")
-  return shuffleArray([...deckCards]);
+  // deckCards already has repeated basics (e.g. 10x "Forest").
+  // Exclude the commander — she lives in the command zone, not the library.
+  return shuffleArray(deckCards.filter(c => !CARDS[c]?.tags?.includes("commander")));
 }
 
 // Card image shown during mulligan — fetches from Scryfall, shows spinner while loading.
@@ -7390,9 +7568,9 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
     library = buildLibrary(deckCards);
     hand = library.slice(0, 7);
     library = library.slice(7);
-    const dorks = hand.filter(c => CARDS[c]?.tags?.includes("dork")).length;
-    const lands  = hand.filter(c => CARDS[c]?.type === "land").length;
-    const tutors = hand.filter(c => CARDS[c]?.tags?.includes("tutor")).length;
+    const dorks = hand.filter(c => getCard(c)?.tags?.includes("dork")).length;
+    const lands  = hand.filter(c => getCard(c)?.type === "land").length;
+    const tutors = hand.filter(c => getCard(c)?.tags?.includes("tutor")).length;
     const canMakeT1Mana = lands >= 1 || dorks >= 2;
     const keep = (dorks >= 1 && tutors >= 1 && canMakeT1Mana) ||
                  (dorks >= 2 && lands >= 1);
@@ -7402,10 +7580,10 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
         const toBottom = m; // bottom m cards (worst: excess lands, then non-combo)
         // Score cards — keep high-value, bottom basics and excess lands
         const scored = hand.map(c => {
-          const isDork  = CARDS[c]?.tags?.includes("dork") ? 3 : 0;
-          const isTutor = CARDS[c]?.tags?.includes("tutor") ? 3 : 0;
-          const isLand  = CARDS[c]?.type === "land" ? 1 : 0;
-          const isCombo = CARDS[c]?.tags?.some(t => ["ashaya","duskwatch","quirion","earthcraft","wirewood"].includes(t)) ? 2 : 0;
+          const isDork  = getCard(c)?.tags?.includes("dork") ? 3 : 0;
+          const isTutor = getCard(c)?.tags?.includes("tutor") ? 3 : 0;
+          const isLand  = getCard(c)?.type === "land" ? 1 : 0;
+          const isCombo = getCard(c)?.tags?.some(t => ["ashaya","duskwatch","quirion","earthcraft","wirewood"].includes(t)) ? 2 : 0;
           return { c, score: isDork + isTutor + isCombo + isLand };
         }).sort((a, b) => a.score - b.score); // lowest score → bottom
         const bottomed = scored.slice(0, toBottom).map(x => x.c);
@@ -7443,7 +7621,7 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
 
       // Always play a land first
       if (!landPlayed) {
-        const landIdx = hand.findIndex(c => CARDS[c]?.type === "land");
+        const landIdx = hand.findIndex(c => getCard(c)?.type === "land");
         if (landIdx >= 0) {
           const land = hand.splice(landIdx, 1)[0];
           battlefield.push(land);
@@ -7488,7 +7666,7 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
 
       if (cardToPlay) {
         const idx = hand.indexOf(cardToPlay);
-        const cardData = CARDS[cardToPlay];
+        const cardData = getCard(cardToPlay);
         const cmc = cardData?.cmc ?? 0;
         const cardType = cardData?.type ?? "";
         if (idx >= 0 && cmc <= mana && cardType !== "land") {
@@ -7507,7 +7685,7 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
       // Fallback: cast the highest-CMC affordable non-land card in hand
       if (!played) {
         const affordable = hand
-          .map((c, i) => ({ c, i, cmc: CARDS[c]?.cmc ?? 0, type: CARDS[c]?.type ?? "" }))
+          .map((c, i) => ({ c, i, cmc: getCard(c)?.cmc ?? 0, type: getCard(c)?.type ?? "" }))
           .filter(x => x.type !== "land" && x.cmc <= mana && x.cmc > 0)
           .sort((a, b) => b.cmc - a.cmc);
         if (affordable.length > 0) {
@@ -7535,10 +7713,11 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
 
 // Run N games synchronously, return aggregated stats
 function runNGames(deckCards, n = 50, maxTurns = 20) {
-  const deckSet = new Set(deckCards);
+  const nonCommanderCards = deckCards.filter(c => !CARDS[c]?.tags?.includes("commander"));
+  const deckSet = new Set(nonCommanderCards);
   const results = [];
   for (let i = 0; i < n; i++) {
-    results.push(simulateOneGame(deckCards, deckSet, 2, maxTurns));
+    results.push(simulateOneGame(nonCommanderCards, deckSet, 2, maxTurns));
   }
 
   const wins        = results.filter(r => r.winTurn !== null);
@@ -7586,6 +7765,18 @@ function runNGames(deckCards, n = 50, maxTurns = 20) {
 function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   // ── state ──────────────────────────────────────────────────
   const [phase, setPhase] = useState("setup"); // setup | mulligan | playing | stats
+  // ── responsive layout ──────────────────────────────────────
+  const [containerWidth, setContainerWidth] = useState(window.innerWidth);
+  const containerRef2 = useRef(null);
+  useEffect(() => {
+    const el = containerRef2.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setContainerWidth(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const isMobile = containerWidth < 700;
+  const [mobileTab, setMobileTab] = useState("advisor"); // "zones" | "advisor" | "log"
   const [library, setLibrary] = useState([]);
   const [hand, setHand] = useState([]);
   const [battlefield, setBattlefield] = useState([]);
@@ -7621,7 +7812,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   const [dragOver, setDragOver] = useState(null); // zone name being hovered
   // ── Run N state ─────────────────────────────────────────────
   const [runNCount, setRunNCount] = useState(100);
-  const [runNMaxTurns, setRunNMaxTurns] = useState(10);
+  const [runNMaxTurns, setRunNMaxTurns] = useState(8);
   const [runNResults, setRunNResults] = useState(null);
   const [runNRunning, setRunNRunning] = useState(false);
   const [simTooltip, setSimTooltip] = useState(null); // {id, text, x, y} | null
@@ -7847,7 +8038,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
 
   // ── CAST FROM HAND (single click) ───────────────────────────
   function castFromHand(card, idx) {
-    const type = CARDS[card]?.type;
+    const type = getCard(card)?.type;
     // Remove from hand
     setHand(prev => [...prev.slice(0, idx), ...prev.slice(idx + 1)]);
     if (type === "land") {
@@ -7971,7 +8162,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
 
     if (toZone === "hand") setHand(prev => [...prev, card]);
     else if (toZone === "battlefield") {
-      const type = CARDS[card]?.type;
+      const type = getCard(card)?.type;
       if (type === "instant" || type === "sorcery") { setGraveyard(prev => [...prev, card]); addLog(`${card} → graveyard (instant/sorcery).`, COLORS.textDim); closeContextMenu(); return; }
       setBattlefield(prev => [...prev, card]);
     }
@@ -8150,7 +8341,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   // remount it on every parent render, which would kill hover state
   // and cause the context menu to disappear.
   const renderCard = (card, i, zone, { isTap = false, curCount = 0, onClick, style: extraStyle } = {}) => {
-    const isLand = CARDS[card]?.type === "land";
+    const isLand = getCard(card)?.type === "land";
     const fetch = isFetch(card);
     return (
       <HoverCard key={`${zone}:${card}:${i}`} card={card}>
@@ -8178,7 +8369,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   };
 
   // ── render helpers ──────────────────────────────────────────
-  const isFetch = (card) => CARDS[card]?.tags?.includes("fetch");
+  const isFetch = (card) => getCard(card)?.tags?.includes("fetch");
 
   const cardPillStyle = (isTapped, isSelected) => ({
     display: "inline-flex", alignItems: "center", gap: "4px",
@@ -8295,7 +8486,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
               }}>
                 <span style={{ flex: 1, fontSize: "12px", color: toBottom ? COLORS.textDim : COLORS.text, fontFamily: "'Crimson Text', serif", textDecoration: toBottom ? "line-through" : "none" }}>
                   {i + 1}. {card}
-                  {CARDS[card] && <span style={{ fontSize: "10px", color: COLORS.textDim, marginLeft: "6px" }}>{CARDS[card].type}</span>}
+                  {getCard(card) && <span style={{ fontSize: "10px", color: COLORS.textDim, marginLeft: "6px" }}>{getCard(card).type}</span>}
                 </span>
                 {!toBottom && (
                   <>
@@ -8351,7 +8542,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
           <div key={i} onClick={() => tutorCard(card)} style={{ padding: "6px 10px", cursor: "pointer", borderRadius: "4px", fontSize: "12px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", marginBottom: "2px" }}
             onMouseEnter={e => { e.currentTarget.style.background = "#1a3a1a"; e.currentTarget.style.color = COLORS.green2; }}
             onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = COLORS.textMid; }}>
-            {card}{CARDS[card] && <span style={{ fontSize: "10px", color: COLORS.textDim, marginLeft: "8px" }}>{CARDS[card].type}</span>}
+            {card}{getCard(card) && <span style={{ fontSize: "10px", color: COLORS.textDim, marginLeft: "8px" }}>{getCard(card).type}</span>}
           </div>
         ))}
         <button onClick={() => { setShowTutor(false); setTutorQuery(""); }} style={{
@@ -8371,7 +8562,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
       alignItems: "stretch", justifyContent: "center",
       padding: "12px",
     }} onClick={onClose}>
-      <div style={{
+      <div ref={containerRef2} style={{
         background: COLORS.bg, border: `1px solid ${COLORS.borderBright}`,
         borderRadius: "12px", width: "100%", maxWidth: "1400px",
         display: "flex", flexDirection: "column", overflow: "hidden",
@@ -8379,12 +8570,15 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
 
         {/* Header */}
         <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}`,
-          flexShrink: 0,
+          display: "flex", alignItems: isMobile ? "flex-start" : "center",
+          justifyContent: "space-between",
+          padding: isMobile ? "10px 12px" : "14px 20px",
+          borderBottom: `1px solid ${COLORS.border}`,
+          flexShrink: 0, flexWrap: isMobile ? "wrap" : "nowrap", gap: "8px",
         }}>
-          <div>
-            <div style={{ fontFamily: "'Cinzel', serif", fontSize: "14px", color: COLORS.green3, letterSpacing: "2px" }}>
+          {/* Title — takes full width on mobile so buttons wrap below */}
+          <div style={{ flex: isMobile ? "1 1 100%" : "0 0 auto" }}>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: isMobile ? "12px" : "14px", color: COLORS.green3, letterSpacing: "2px" }}>
               🐟 GOLDFISH MODE
             </div>
             {activeDeck && (
@@ -8393,8 +8587,9 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
               </div>
             )}
           </div>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            {phase === "playing" && (
+          {/* Button row — wraps naturally, ✕ always visible */}
+          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+            {phase === "playing" && !isMobile && (
               <>
                 <div style={{ padding: "4px 12px", background: "#1a2e1a", border: `1px solid ${COLORS.border}`, borderRadius: "6px", fontSize: "11px", color: COLORS.textMid, fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>
                   Turn {turnNumber} · {isMyTurn ? "Your Turn" : "Opp Turn"}
@@ -8402,47 +8597,56 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                 <div style={{ padding: "4px 12px", background: "#0f1e0f", border: `1px solid ${COLORS.border}`, borderRadius: "6px", fontSize: "11px", color: COLORS.textDim, fontFamily: "'Cinzel', serif" }}>
                   {library.length} in library
                 </div>
+              </>
+            )}
+            {phase === "playing" && isMobile && (
+              <div style={{ padding: "3px 8px", background: "#1a2e1a", border: `1px solid ${COLORS.border}`, borderRadius: "6px", fontSize: "10px", color: COLORS.textMid, fontFamily: "'Cinzel', serif" }}>
+                T{turnNumber}
+              </div>
+            )}
+            {phase === "playing" && (
+              <>
                 <button onClick={exportToAdvisor} style={{
                   background: "none", border: `1px solid ${COLORS.blue}`, borderRadius: "6px",
-                  padding: "5px 12px", color: COLORS.blue, cursor: "pointer",
+                  padding: isMobile ? "4px 8px" : "5px 12px", color: COLORS.blue, cursor: "pointer",
                   fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
                 }}
                   onMouseEnter={e => { e.target.style.background = "#0a1a2e"; }}
                   onMouseLeave={e => { e.target.style.background = "transparent"; }}
                   title="Send this board state to the main advisor"
-                >↗ EXPORT</button>
+                >↗ {isMobile ? "" : "EXPORT"}{isMobile && "EXP"}</button>
                 <button onClick={endGame} style={{
                   background: "none", border: `1px solid ${COLORS.gold}`, borderRadius: "6px",
-                  padding: "5px 12px", color: COLORS.gold, cursor: "pointer",
+                  padding: isMobile ? "4px 8px" : "5px 12px", color: COLORS.gold, cursor: "pointer",
                   fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
                 }}
                   onMouseEnter={e => { e.target.style.background = "#1a1a0a"; }}
                   onMouseLeave={e => { e.target.style.background = "transparent"; }}
                   title="End this game and record stats"
-                >★ END GAME</button>
+                >★ {isMobile ? "END" : "END GAME"}</button>
               </>
             )}
             {gameHistory.length > 0 && (
               <button onClick={() => setPhase("stats")} style={{
                 background: phase === "stats" ? "#1a1a0a" : "none",
                 border: `1px solid ${COLORS.gold}`, borderRadius: "6px",
-                padding: "5px 10px", color: COLORS.gold, cursor: "pointer",
+                padding: isMobile ? "4px 8px" : "5px 10px", color: COLORS.gold, cursor: "pointer",
                 fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px",
-              }}>★ STATS ({gameHistory.length})</button>
+              }}>★ {isMobile ? `${gameHistory.length}` : `STATS (${gameHistory.length})`}</button>
             )}
             {phase === "playing" && (
               <button onClick={() => setPhase("setup")} style={{
                 background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "6px",
-                padding: "5px 10px", color: COLORS.textDim, cursor: "pointer",
+                padding: isMobile ? "4px 8px" : "5px 10px", color: COLORS.textDim, cursor: "pointer",
                 fontFamily: "'Cinzel', serif", fontSize: "11px",
               }}
                 onMouseEnter={e => { e.target.style.borderColor = COLORS.red; e.target.style.color = COLORS.red; }}
                 onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
-              >↺ NEW GAME</button>
+              >↺ {isMobile ? "" : "NEW GAME"}{isMobile && "NEW"}</button>
             )}
             <button onClick={onClose} style={{
               background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "6px",
-              padding: "5px 10px", color: COLORS.textDim, cursor: "pointer",
+              padding: isMobile ? "4px 10px" : "5px 10px", color: COLORS.textDim, cursor: "pointer",
               fontFamily: "'Cinzel', serif", fontSize: "13px",
             }}>✕</button>
           </div>
@@ -8486,8 +8690,8 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
         )}
 
         {phase === "mulligan" && (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "24px 28px", overflow: "auto" }}>
-            <div style={{ fontFamily: "'Cinzel', serif", fontSize: "12px", color: COLORS.gold, letterSpacing: "2px", marginBottom: "20px" }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "16px", overflow: "hidden" }}>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: "12px", color: COLORS.gold, letterSpacing: "2px", marginBottom: "12px", flexShrink: 0 }}>
               OPENING HAND {mulliganCount > 0 ? `(Mulligan #${mulliganCount})` : ""} · {hand.length} CARDS
               {phase2 === "bottoming" && (
                 <span style={{ marginLeft: "16px", color: COLORS.textDim, fontSize: "11px" }}>
@@ -8496,11 +8700,14 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
               )}
             </div>
 
-            {/* Card image row */}
+            {/* Card image row — scrolls horizontally on mobile */}
             <div style={{
-              display: "flex", gap: "12px", flexWrap: "wrap",
-              marginBottom: "32px", alignItems: "flex-end", minHeight: "220px",
-              padding: "12px 4px",
+              display: "flex", gap: "10px", flexWrap: isMobile ? "nowrap" : "wrap",
+              overflowX: isMobile ? "auto" : "visible",
+              marginBottom: "16px", alignItems: "flex-end",
+              minHeight: isMobile ? undefined : "220px",
+              padding: "8px 4px",
+              flexShrink: isMobile ? 0 : undefined,
             }}>
               {hand.map((card, i) => {
                 const key = `${card}:${i}`;
@@ -8590,12 +8797,28 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
         )}
 
         {phase === "playing" && (
-          <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0 }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
+
+            {/* Mobile tab bar */}
+            {isMobile && (
+              <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+                {[["zones","⊞ Zones"],["advisor","✦ Advisor"],["log","📜 Log"]].map(([tab, label]) => (
+                  <button key={tab} onClick={() => setMobileTab(tab)} style={{
+                    flex: 1, padding: "8px 4px", border: "none", borderBottom: `2px solid ${mobileTab === tab ? COLORS.green1 : "transparent"}`,
+                    background: "none", color: mobileTab === tab ? COLORS.green2 : COLORS.textDim,
+                    fontFamily: "'Cinzel', serif", fontSize: "10px", letterSpacing: "1px", cursor: "pointer",
+                  }}>{label}</button>
+                ))}
+              </div>
+            )}
+
+            <div style={{ flex: 1, display: "flex", flexDirection: "row", overflow: "hidden", minHeight: 0 }}>
 
             {/* LEFT: zones */}
             <div style={{
-              width: "330px", flexShrink: 0, borderRight: `1px solid ${COLORS.border}`,
-              display: "flex", flexDirection: "column", overflow: "hidden",
+              width: isMobile ? "100%" : "330px", flexShrink: 0, borderRight: isMobile ? "none" : `1px solid ${COLORS.border}`,
+              display: isMobile && mobileTab !== "zones" ? "none" : "flex",
+              flexDirection: "column", overflow: "hidden",
               position: "relative",
             }}>
               {/* Controls strip */}
@@ -8642,7 +8865,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                     {hand.length === 0
                       ? <span style={{ fontSize: "11px", color: COLORS.textDim, fontStyle: "italic" }}>Empty</span>
                       : hand.map((card, i) => {
-                          const isLand = CARDS[card]?.type === "land";
+                          const isLand = getCard(card)?.type === "land";
                           const cantPlay = isLand && landPlayed;
                           return renderCard(card, i, "hand", {
                             onClick: () => !cantPlay && castFromHand(card, i),
@@ -8734,7 +8957,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
               </div>
             </div>
             {/* MIDDLE: advisor */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+            <div style={{ flex: 1, display: isMobile && mobileTab !== "advisor" ? "none" : "flex", flexDirection: "column", overflow: "hidden", minWidth: 0, width: isMobile ? "100%" : undefined }}>
               <div style={{
                 padding: "10px 16px", borderBottom: `1px solid ${COLORS.border}`,
                 fontSize: "10px", color: COLORS.textDim, letterSpacing: "2px",
@@ -8786,8 +9009,9 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
 
             {/* RIGHT: log */}
             <div style={{
-              width: "240px", flexShrink: 0, borderLeft: `1px solid ${COLORS.border}`,
-              display: "flex", flexDirection: "column", overflow: "hidden",
+              width: isMobile ? "100%" : "240px", flexShrink: 0, borderLeft: isMobile ? "none" : `1px solid ${COLORS.border}`,
+              display: isMobile && mobileTab !== "log" ? "none" : "flex",
+              flexDirection: "column", overflow: "hidden",
             }}>
               <div style={{ padding: "10px 14px", borderBottom: `1px solid ${COLORS.border}`, fontSize: "10px", color: COLORS.textDim, letterSpacing: "2px", fontFamily: "'Cinzel', serif", flexShrink: 0 }}>
                 GAME LOG
@@ -8804,6 +9028,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                 )}
               </div>
             </div>
+            </div> {/* end row wrapper */}
           </div>
         )}
 
@@ -9098,7 +9323,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   );
 }
 
-function SynergyMapModal({ onClose }) {
+function SynergyMapModal({ onClose, activeDeck }) {
   const containerRef = useRef(null);
   const outerRef     = useRef(null);  // stable ref always in DOM for ResizeObserver
   const [view, setView]               = useState("graph");
@@ -9110,10 +9335,16 @@ function SynergyMapModal({ onClose }) {
   const [pan, setPan]                 = useState({ x: 0, y: 0 });
   const [zoom, setZoom]               = useState(1);
   const [draggingNode, setDraggingNode] = useState(null);
+  const [deckOnly, setDeckOnly]       = useState(!!activeDeck);
   const dragOffRef  = useRef({ x: 0, y: 0 });
   const isPanningRef = useRef(false);
   const panStartRef  = useRef({ x: 0, y: 0, px: 0, py: 0 });
   const [, forceUpdate] = useState(0);
+
+  const deckCardSet = React.useMemo(
+    () => activeDeck ? new Set(activeDeck.cards) : null,
+    [activeDeck]
+  );
 
   // Measure the stable outer wrapper — always mounted regardless of view
   useEffect(() => {
@@ -9147,8 +9378,15 @@ function SynergyMapModal({ onClose }) {
   }, []);
 
   const visibleComboIds = React.useMemo(
-    () => new Set(COMBOS.filter(c => activeTypes.has(c.type)).map(c => "combo:"+c.id)),
-    [activeTypes]
+    () => new Set(COMBOS.filter(c => {
+      if (!activeTypes.has(c.type)) return false;
+      if (deckOnly && deckCardSet) {
+        // Only show combos where every required card is in the deck
+        return (c.requires || []).every(r => deckCardSet.has(r));
+      }
+      return true;
+    }).map(c => "combo:"+c.id)),
+    [activeTypes, deckOnly, deckCardSet]
   );
   const visibleLinks = links.filter(l => visibleComboIds.has(l.target));
   const visibleCardIds = new Set(visibleLinks.map(l => l.source));
@@ -9279,6 +9517,17 @@ function SynergyMapModal({ onClose }) {
           <div style={{ fontSize:"11px", color:COLORS.textDim, fontFamily:"'Crimson Text', serif" }}>
             {visibleNodes.filter(n=>n.kind==="card").length} cards · {visibleNodes.filter(n=>n.kind==="combo").length} combos
           </div>
+          {activeDeck && (
+            <button onClick={() => setDeckOnly(v => !v)} style={{
+              background: deckOnly ? "#1a3a1a" : "none",
+              border: `1px solid ${deckOnly ? COLORS.green1 : COLORS.border}`,
+              borderRadius: "4px", padding: "2px 9px",
+              color: deckOnly ? COLORS.green2 : COLORS.textDim,
+              cursor: "pointer", fontSize: "10px", fontFamily: "'Cinzel', serif", letterSpacing: "0.5px",
+            }}>
+              {deckOnly ? `📚 ${activeDeck.name}` : "📚 ALL CARDS"}
+            </button>
+          )}
           <div style={{ flex:1 }} />
           <div style={{ display:"flex", gap:"4px", flexWrap:"wrap" }}>
             {Object.entries(TYPE_LABELS).map(([t, label]) => (
@@ -9651,7 +9900,7 @@ function YevaAdvisor() {
   const tour = useTour();
 
   // Compute the active deck's card set for filtering
-  const activeDeck = decks?.find(d => d.id === activeDeckId) ?? null;
+  const activeDeck = (activeDeckId && PRESET_DECKS.find(d => d.id === activeDeckId)) || decks?.find(d => d.id === activeDeckId) || null;
   const deckList = activeDeck ? new Set(activeDeck.cards) : null;
   const [hand, setHand] = useState([]);
   const [battlefield, setBattlefield] = useState([]);
@@ -9738,10 +9987,10 @@ function YevaAdvisor() {
   // Each card is unique — adding to one zone removes it from the other two
   const addTo = (zone) => (card) => {
     if (zone === "battlefield") {
-      const type = CARDS[card]?.type;
+      const type = getCard(card)?.type;
       if (type === "instant" || type === "sorcery") return;
     }
-    const isBasic = CARDS[card]?.tags?.includes("basic");
+    const isBasic = getCard(card)?.tags?.includes("basic");
     // For non-basics: move semantics (remove from other zones, add to destination)
     // For basics: add semantics (can exist in multiple zones simultaneously — don't remove from others)
     if (!isBasic) {
@@ -9983,7 +10232,7 @@ function YevaAdvisor() {
           </div>
 
           {/* SYNERGY MAP MODAL */}
-          {showSynergyMap && <SynergyMapModal onClose={() => setShowSynergyMap(false)} />}
+          {showSynergyMap && <SynergyMapModal activeDeck={activeDeck} onClose={() => setShowSynergyMap(false)} />}
           {/* GOLDFISH MODAL */}
           {showGoldfish && (
             <GoldfishModal
