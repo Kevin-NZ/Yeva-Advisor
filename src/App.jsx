@@ -7345,6 +7345,319 @@ function useSavedStates() {
   return { states, save };
 }
 
+// ── HelpModal ──────────────────────────────────────────────────────────────────
+function HelpModal({ onClose, onStartTour }) {
+  const [tab, setTab] = useState("overview");
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const TABS = [
+    { id: "overview",   label: "Overview" },
+    { id: "advisor",    label: "Advisor" },
+    { id: "goldfish",   label: "Goldfish" },
+    { id: "shortcuts",  label: "Shortcuts" },
+    { id: "combos",     label: "Combos" },
+    { id: "tour",       label: "Tour" },
+    { id: "changelog",  label: "What's New" },
+  ];
+
+  const H = ({ children }) => (
+    <div style={{ fontSize: "10px", letterSpacing: "2px", color: COLORS.green3, fontFamily: "'Cinzel', serif", marginTop: "20px", marginBottom: "8px", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: "4px" }}>{children}</div>
+  );
+  const P = ({ children }) => (
+    <p style={{ fontSize: "13px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", lineHeight: 1.65, marginBottom: "10px" }}>{children}</p>
+  );
+  const Key = ({ k }) => (
+    <span style={{ display: "inline-block", background: "#1a2e1a", border: `1px solid ${COLORS.border}`, borderRadius: "4px", padding: "1px 6px", fontSize: "11px", fontFamily: "monospace", color: COLORS.green1, margin: "0 2px" }}>{k}</span>
+  );
+  const Row = ({ keys, desc }) => (
+    <div style={{ display: "flex", alignItems: "baseline", gap: "12px", marginBottom: "7px" }}>
+      <div style={{ minWidth: "120px", flexShrink: 0 }}>{keys.map((k,i) => <Key key={i} k={k} />)}</div>
+      <div style={{ fontSize: "13px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif" }}>{desc}</div>
+    </div>
+  );
+  const Tip = ({ label, children }) => (
+    <div style={{ marginBottom: "10px" }}>
+      <div style={{ fontSize: "11px", color: COLORS.green2, fontFamily: "'Cinzel', serif", marginBottom: "3px" }}>{label}</div>
+      <div style={{ fontSize: "13px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", lineHeight: 1.6, paddingLeft: "8px", borderLeft: `2px solid ${COLORS.border}` }}>{children}</div>
+    </div>
+  );
+
+  const content = {
+    overview: (
+      <>
+        <H>WHAT IS YEVA ADVISOR?</H>
+        <P>Yeva Advisor is a deck-building and play assistant for a green combo Commander deck built around Yeva, Nature's Herald. It analyses your current game state and recommends lines of play, tracks combos, and lets you golfish to test your draws.</P>
+        <H>MAIN PANELS</H>
+        <Tip label="Input Panel (left)">Enter the cards in your hand, battlefield, and graveyard. The advisor analyses your position in real time as you type. Use the zone tabs to switch between Hand, Battlefield, and Graveyard.</Tip>
+        <Tip label="Advice Panel (right)">Shows the best available lines of play ranked by priority. WIN NOW lines are always shown first. Each line lists the cards required and a step-by-step description.</Tip>
+        <Tip label="Mana Available">Set how much mana you currently have floating. The advisor uses this to filter which lines are immediately executable vs. requiring more mana.</Tip>
+        <H>GETTING STARTED</H>
+        <P>1. Load or build a deck using the DECKS button. 2. Enter your current board state in the input panel. 3. Set your available mana and whose turn it is. 4. Read the recommendations in the advice panel.</P>
+      </>
+    ),
+    advisor: (
+      <>
+        <H>ENTERING CARDS</H>
+        <Tip label="Autocomplete">Start typing a card name — suggestions appear from the deck list. Press Enter or click to add. Tab moves between zones.</Tip>
+        <Tip label="Zone inputs">Hand cards are what you're holding. Battlefield is everything you control face-up. Graveyard is your discard pile. Cards moved to the wrong zone will give incorrect advice.</Tip>
+        <Tip label="Quick-add buttons">Small shortcut buttons above each zone let you add commonly needed cards without typing the full name.</Tip>
+        <H>READING ADVICE</H>
+        <Tip label="WIN NOW">You have everything needed to win this turn. Follow the steps exactly.</Tip>
+        <Tip label="WIN NEXT TURN">One more turn of setup gives you the win. The listed cards are what you still need.</Tip>
+        <Tip label="STRONG / GOOD / SETUP">Prioritised lines to develop your board. Strong lines are worth pursuing even if not immediately winning.</Tip>
+        <Tip label="Infinite mana indicator">The ∞ badge appears when the advisor detects you have an active infinite mana loop on board.</Tip>
+        <H>OTHER FEATURES</H>
+        <Tip label="Synergy Map (⬡ SYNERGY)">Visual graph showing how cards in your deck connect to combos and each other. Filter by card type or zoom to a specific card.</Tip>
+        <Tip label="Saved States (📌 STATES)">Save a snapshot of your current board state and reload it later. Useful for testing different lines from the same position.</Tip>
+        <Tip label="Export from Goldfish">The ↗ EXPORT button in Goldfish mode sends your current board state directly into the advisor panel.</Tip>
+      </>
+    ),
+    goldfish: (
+      <>
+        <H>WHAT IS GOLDFISH MODE?</H>
+        <P>Goldfish mode simulates playing the deck alone — no opponent — to test how consistently it assembles its combo. You draw opening hands, play through turns, and track milestones.</P>
+        <H>PLAYING A GAME</H>
+        <Tip label="Opening hand">You start with 7 cards. Click KEEP to keep the hand or MULLIGAN to take a new one (one fewer card each time). Cards sent to the bottom are chosen before you see the new hand.</Tip>
+        <Tip label="Playing cards">Click any card in your hand to play it. Lands go to the battlefield, instants/sorceries go to the graveyard. The land-played indicator shows whether you've played your land for the turn.</Tip>
+        <Tip label="Tapping permanents">Click a card on the battlefield to tap or untap it. Mana-producing cards automatically update the mana pool. The pool badge shows your current floating mana.</Tip>
+        <Tip label="Mana pool">The pool tracks mana as you tap sources and cast spells. Use − and + to adjust manually. It resets to 0 at the start of each turn.</Tip>
+        <Tip label="Context menu">Right-click any card to move it between zones, crack fetch lands, or access other actions.</Tip>
+        <H>CONTROLS STRIP</H>
+        <Tip label="▶ NEXT TURN">Untaps all permanents, draws a card, advances the turn counter, and resets the mana pool.</Tip>
+        <Tip label="↺ UNTAP">Untaps all permanents without advancing the turn. Use this mid-turn for Wirewood Lodge effects.</Tip>
+        <Tip label="🔍 TUTOR">Search your library by card name, type, or tag (e.g. type 'dork' to find all mana creatures).</Tip>
+        <Tip label="⚡ TAP ALL">Taps all untapped mana sources at once and fills the pool to its maximum for the turn.</Tip>
+        <Tip label="↩ UNDO">Reverts the last action. Up to 20 levels of undo are stored per game.</Tip>
+        <Tip label="👁 SCRY">Look at the top cards of your library and choose which to keep on top or send to the bottom.</Tip>
+        <Tip label="🌿 YEVA">Cast Yeva from the command zone. Tax increases by 2 each time she's cast.</Tip>
+        <H>STATISTICS</H>
+        <Tip label="Game log">The right panel records every action taken this game. Scroll down to see earlier turns.</Tip>
+        <Tip label="★ END GAME">Records the game result, turn count, milestones, and opening hand. Adds to your stats history.</Tip>
+        <Tip label="★ STATS">Shows win rate, average turn, mana curve, and win condition breakdown across all recorded games for this deck.</Tip>
+        <Tip label="📼 Replay">Each completed game stores a full replay. Click the 📼 icon in the stats table to step through it turn by turn.</Tip>
+        <Tip label="Auto-simulate">Set a game count and run hundreds of simulated games automatically to see statistical win rates without playing manually.</Tip>
+      </>
+    ),
+    shortcuts: (
+      <>
+        <H>GOLDFISH MODE — KEYBOARD SHORTCUTS</H>
+        <Row keys={["N"]} desc="Next turn — untap, draw, advance turn counter" />
+        <Row keys={["U"]} desc="Untap all permanents" />
+        <Row keys={["T"]} desc="Open tutor search" />
+        <Row keys={["D"]} desc="Draw one card" />
+        <Row keys={["M"]} desc="Tap all mana sources" />
+        <Row keys={["Ctrl", "Z"]} desc="Undo last action" />
+        <Row keys={["Esc"]} desc="Close any open overlay or sub-modal" />
+        <H>TUTOR SEARCH</H>
+        <Row keys={["↑ ↓"]} desc="Navigate results (Enter to tutor)" />
+        <Row keys={["Esc"]} desc="Close tutor without tutoring" />
+        <H>REPLAY VIEWER</H>
+        <Row keys={["←"]} desc="Previous turn snapshot" />
+        <Row keys={["→"]} desc="Next turn snapshot" />
+        <Row keys={["Esc"]} desc="Close replay" />
+        <H>MAIN ADVISOR</H>
+        <Row keys={["Shift", "S"]} desc="Open Saved States panel" />
+        <Row keys={["Tab"]} desc="Cycle focus between zone inputs" />
+        <Row keys={["Esc"]} desc="Close any open modal" />
+      </>
+    ),
+    combos: (
+      <>
+        <H>INFINITE MANA LOOPS</H>
+        <Tip label="Priest / Archdruid + Wirewood Lodge">Tap a big elf dork (Priest of Titania, Elvish Archdruid) for N mana. Pay {"{G}"} to use Lodge to untap it. Net N−1 mana per loop. Requires N ≥ 2 elves in play.</Tip>
+        <Tip label="Argothian Elder + Wirewood Lodge + Big Land">Tap a land producing ≥2 mana (Cradle, Nykthos, enchanted Forest). Elder untaps that land and Lodge. Lodge untaps Elder. Net mana each loop.</Tip>
+        <Tip label="Earthcraft + Squirrel Nest">Tap a creature to untap a basic Forest via Earthcraft. Forest creates a Squirrel token via Nest. Tap Squirrel to untap Forest again. Infinite creatures and mana.</Tip>
+        <Tip label="Ashaya + Quirion Ranger / Scryb Ranger">With Ashaya, creatures are Forests. Bounce a creature to hand to untap a Forest (which is another creature). Return it to play. Generates mana each loop with a mana dork involved.</Tip>
+        <H>WIN CONDITIONS</H>
+        <Tip label="Thassa's Oracle">With infinite mana and a tutor chain, draw your entire deck. Cast Oracle with an empty library for an immediate win.</Tip>
+        <Tip label="Duskwatch Recruiter">With infinite mana, activate repeatedly to draw every creature from your deck. Win with an arbitrarily large board.</Tip>
+        <Tip label="Walking Ballista">With infinite mana, cast for X=∞ and deal infinite damage to each opponent.</Tip>
+        <Tip label="Natural Order / Green Sun's Zenith">With enough mana, tutor directly for Craterhoof Behemoth or another finisher. GSZ shuffles back and can be cast again.</Tip>
+        <H>KEY SYNERGIES</H>
+        <Tip label="Yavimaya, Cradle of Growth">Makes all lands Forests. Enables Arbor Elf to untap any land, dramatically expanding the mana available per turn.</Tip>
+        <Tip label="Utopia Sprawl / Wild Growth">Enchant a Forest to tap for an extra mana. With Arbor Elf, each untap of the enchanted land produces bonus mana.</Tip>
+        <Tip label="Gaea's Cradle / Itlimoc">Taps for mana equal to the number of creatures you control. Goes infinite with any untap effect and enough creatures.</Tip>
+      </>
+    ),
+    tour: (
+      <>
+        <H>INTERACTIVE TOUR</H>
+        <P>The guided tour walks through the main interface step by step, highlighting each area and explaining what it does. It takes about a minute and covers all the key panels.</P>
+        <P>The tour closes this manual and starts on the main advisor screen. You can skip it at any time by pressing the Skip button.</P>
+        <div style={{ textAlign: "center", marginTop: "32px" }}>
+          <button onClick={onStartTour} style={{
+            background: "#1a3a1a", border: `2px solid ${COLORS.green1}`, borderRadius: "8px",
+            padding: "12px 32px", color: COLORS.green1, cursor: "pointer",
+            fontFamily: "'Cinzel', serif", fontSize: "13px", letterSpacing: "2px",
+            transition: "all 0.2s",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#1f4a1f"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "#1a3a1a"; e.currentTarget.style.color = COLORS.green1; }}
+          >▶ START GUIDED TOUR</button>
+          <div style={{ marginTop: "12px", fontSize: "11px", color: COLORS.textDim, fontFamily: "'Crimson Text', serif" }}>
+            Closes this manual and begins the tour on the main screen
+          </div>
+        </div>
+      </>
+    ),
+    changelog: (() => {
+      const versions = [
+        {
+          version: "1.7.0", date: "2026-03-06", title: "Help System & Polish",
+          added: [
+            "In-app manual (? button) with tabbed sections: Overview, Advisor, Goldfish, Shortcuts, Combos, Tour, What's New",
+            "Tooltips on all main header buttons and goldfish control buttons",
+          ],
+          fixed: [
+            "Escape in tutor overlay no longer closes entire Goldfish modal",
+            "Escape now consistently closes Synergy Map modal",
+            "Close (✕) buttons pinned absolutely to top-right of modal headers — no longer wrap on small screens",
+          ],
+        },
+        {
+          version: "1.6.0", date: "2026-03-06", title: "Goldfish Productivity",
+          added: [
+            "Undo system — up to 20 levels; Ctrl+Z shortcut and ↩ UNDO button",
+            "Wirewood Lodge untap targeting modal — pick which elf to untap",
+            "Mana pool delta flash — +N / −N animates above pool badge on change",
+            "⚡ TAP ALL MANA — one click taps every mana source on the battlefield",
+            "Keyboard shortcuts: N next turn, U untap, T tutor, D draw, M tap all, Ctrl+Z undo, Esc close",
+            "Tutor search by type/tag — type 'dork', 'tutor', 'land' etc. to filter results",
+            "Gamestate breadcrumb — turn · mana · elves · dorks · tutors · combo pieces",
+          ],
+        },
+        {
+          version: "1.5.0", date: "2026-03-05", title: "Replay, Mana Pool & Card Images",
+          added: [
+            "Game replay viewer — step through any completed game turn by turn with card images",
+            "Win combo tracking — winning combo line recorded and shown in stats",
+            "Mana pool tracker — auto-increments on tap, auto-decrements on cast; resets each turn",
+            "Mana curve and win condition breakdown charts in stats panel",
+          ],
+          fixed: [
+            "Per-card mana calculation overhauled — Utopia Sprawl and Arbor Elf now calculated correctly",
+          ],
+        },
+        {
+          version: "1.4.0", date: "2026-03-05", title: "Mobile Layout & Drag-Drop",
+          added: [
+            "Mobile responsive layout for goldfish — tab bar replaces side panels below 700px",
+            "Drag-and-drop between any zones in goldfish mode",
+          ],
+          fixed: [
+            "Green Sun's Zenith mana check corrected; GSZ now shuffles back into library",
+            "Commander (Yeva) excluded from library in goldfish",
+            "SSR/hydration crash on initial render fixed",
+          ],
+        },
+        {
+          version: "1.3.0", date: "2026-03-05", title: "Auto-Simulation & Scryfall",
+          added: [
+            "Run N Games — automated simulator plays N games and reports win rates, bottlenecks, turn distribution",
+            "Scryfall auto-enrichment — unknown cards get type and CMC from Scryfall on import",
+          ],
+          fixed: [
+            "Rules of Hooks violation (useState inside IIFE) — hoisted to component top",
+            "Stats persistence fixed outside Claude artifact environment",
+          ],
+        },
+        {
+          version: "1.2.0", date: "2026-03-05", title: "Statistics & Hand Grader",
+          added: [
+            "Persistent game statistics — win rate, average win turn, milestones per deck",
+            "Hand grader — A–F grade with reasoning during mulligan, advisor-enriched",
+            "Stats panel — game history table, win rates by turn, milestone breakdown",
+          ],
+        },
+        {
+          version: "1.1.0", date: "2026-03-04", title: "Goldfish Mode",
+          added: [
+            "Full solo play simulation (Goldfish mode) with London mulligan",
+            "Tap/untap, counters, scry, fetch cracking, context menus, cast from hand",
+            "Commander tax tracking for Yeva",
+            "77-test harness (node yeva-advisor.test.js)",
+          ],
+        },
+        {
+          version: "1.0.0", date: "2026-03-04", title: "Initial Release",
+          added: [
+            "Core advisor engine with 43 combo definitions",
+            "Deck management with import, editor, comparison, and preset decks",
+            "Synergy map, saved states, guided tutorial tour",
+            "Scryfall card image tooltips on all card names",
+          ],
+        },
+      ];
+
+      return (
+        <>
+          {versions.map(v => (
+            <div key={v.version} style={{ marginBottom: "20px", paddingBottom: "16px", borderBottom: `1px solid ${COLORS.border}` }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "8px", marginTop: "16px" }}>
+                <span style={{ fontSize: "12px", fontFamily: "'Cinzel', serif", color: COLORS.green2, letterSpacing: "1px" }}>v{v.version}</span>
+                <span style={{ fontSize: "11px", color: COLORS.textDim, fontFamily: "'Crimson Text', serif" }}>{v.date}</span>
+                <span style={{ fontSize: "11px", color: COLORS.textMid, fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>— {v.title.toUpperCase()}</span>
+              </div>
+              {v.added && v.added.map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: "8px", marginBottom: "5px", paddingLeft: "8px" }}>
+                  <span style={{ color: COLORS.green1, fontSize: "11px", flexShrink: 0, marginTop: "2px" }}>+</span>
+                  <span style={{ fontSize: "13px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", lineHeight: 1.5 }}>{item}</span>
+                </div>
+              ))}
+              {v.fixed && v.fixed.map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: "8px", marginBottom: "5px", paddingLeft: "8px" }}>
+                  <span style={{ color: COLORS.blue, fontSize: "11px", flexShrink: 0, marginTop: "2px" }}>✦</span>
+                  <span style={{ fontSize: "13px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", lineHeight: 1.5 }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+          <div style={{ fontSize: "11px", color: COLORS.textDim, fontFamily: "'Crimson Text', serif", fontStyle: "italic", textAlign: "center", paddingTop: "8px" }}>
+            + added &nbsp;·&nbsp; ✦ fixed/changed
+          </div>
+        </>
+      );
+    })(),
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#000000dd", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }} onClick={onClose}>
+      <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.borderBright}`, borderRadius: "12px", width: "100%", maxWidth: "680px", maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: "14px 52px 14px 20px", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0, position: "relative" }}>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: "13px", color: COLORS.green3, letterSpacing: "2px" }}>📖 YEVA ADVISOR — MANUAL</div>
+          <div style={{ fontSize: "11px", color: COLORS.textDim, fontFamily: "'Crimson Text', serif", marginTop: "2px" }}>Green Combo Commander · Esc to close</div>
+          <button onClick={onClose} style={{ position: "absolute", top: "10px", right: "12px", background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "6px", padding: "4px 10px", color: COLORS.textDim, cursor: "pointer", fontFamily: "'Cinzel', serif", fontSize: "12px" }}>✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0, overflowX: "auto" }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              background: tab === t.id ? "#0d1f0d" : "none",
+              border: "none", borderBottom: tab === t.id ? `2px solid ${COLORS.green1}` : "2px solid transparent",
+              padding: "8px 16px", color: tab === t.id ? COLORS.green1 : COLORS.textDim,
+              cursor: "pointer", fontFamily: "'Cinzel', serif", fontSize: "10px",
+              letterSpacing: "1.5px", flexShrink: 0, transition: "all 0.15s",
+            }}>{t.label.toUpperCase()}</button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "4px 24px 24px" }}>
+          {content[tab]}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // ── SynergyMapModal ───────────────────────────────────────────────────────────
 // Force-directed graph showing card ↔ combo relationships.
 // Cards = circular nodes (sized by centrality). Combos = pill nodes (colored by type).
@@ -9141,12 +9454,12 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
             )}
             {phase === "playing" && (
               <>
-                <button onClick={tapAllMana} title="Tap all mana sources (M)"
+                <button onClick={tapAllMana} title="Tap every untapped land, dork, and mana rock on the battlefield and fill the mana pool to its maximum (M)"
                   style={{ background: "none", border: `1px solid ${COLORS.green1}`, borderRadius: "6px", padding: isMobile ? "4px 8px" : "5px 12px", color: COLORS.green1, cursor: "pointer", fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px" }}
                   onMouseEnter={e => { e.target.style.background = "#0a1f0a"; }}
                   onMouseLeave={e => { e.target.style.background = "transparent"; }}
                 >⚡ {isMobile ? "" : "TAP ALL"}{isMobile && "TAP"}</button>
-                <button onClick={applyUndo} disabled={undoStack.current.length === 0} title="Undo last action (Ctrl+Z)"
+                <button onClick={applyUndo} disabled={undoStack.current.length === 0} title="Undo the last action. Up to 20 levels of undo are stored per game (Ctrl+Z)"
                   style={{ background: "none", border: `1px solid ${undoStack.current.length > 0 ? COLORS.textMid : COLORS.border}`, borderRadius: "6px", padding: isMobile ? "4px 8px" : "5px 12px", color: undoStack.current.length > 0 ? COLORS.textMid : COLORS.border, cursor: undoStack.current.length > 0 ? "pointer" : "default", fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1px" }}
                   onMouseEnter={e => { if (undoStack.current.length > 0) e.target.style.background = "#1a1a1a"; }}
                   onMouseLeave={e => { e.target.style.background = "transparent"; }}
@@ -9172,7 +9485,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
               </>
             )}
             {gameHistory.length > 0 && (
-              <button onClick={() => setPhase("stats")} style={{
+              <button onClick={() => setPhase("stats")} title="View win rate, average turn, mana curve, and win condition breakdown across all recorded games for this deck" style={{
                 background: phase === "stats" ? "#1a1a0a" : "none",
                 border: `1px solid ${COLORS.gold}`, borderRadius: "6px",
                 padding: isMobile ? "4px 8px" : "5px 10px", color: COLORS.gold, cursor: "pointer",
@@ -9180,7 +9493,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
               }}>★ {isMobile ? `${gameHistory.length}` : `STATS (${gameHistory.length})`}</button>
             )}
             {phase === "playing" && (
-              <button onClick={() => setPhase("setup")} style={{
+              <button onClick={() => setPhase("setup")} title="Abandon this game and return to setup — current game will not be recorded" style={{
                 background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "6px",
                 padding: isMobile ? "4px 8px" : "5px 10px", color: COLORS.textDim, cursor: "pointer",
                 fontFamily: "'Cinzel', serif", fontSize: "11px",
@@ -9373,12 +9686,12 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                   onMouseEnter={e => { e.target.style.background = "#1f4a1f"; }}
                   onMouseLeave={e => { e.target.style.background = "#1a3a1a"; }}
                   title="Untap all, draw a card, advance turn">▶ NEXT TURN</button>
-                <button onClick={() => drawCard(1)} style={btnStyle(COLORS.green1)}>+ DRAW 1</button>
-                <button onClick={() => drawCard(3)} style={btnStyle(COLORS.border)}>+ DRAW 3</button>
-                <button onClick={untapAll} style={btnStyle(COLORS.border)} title="Untap all permanents without advancing turn">↺ UNTAP</button>
-                <button onClick={openTutor} style={btnStyle(COLORS.purple)} title="Search library">🔍 TUTOR</button>
-                <button onClick={() => openScry(3)} style={btnStyle(COLORS.blue)} title="Look at top 3">👁 SCRY 3</button>
-                <button onClick={() => openScry(1)} style={btnStyle(COLORS.border)} title="Scry 1">👁 1</button>
+                <button onClick={() => drawCard(1)} style={btnStyle(COLORS.green1)} title="Draw the top card of your library into your hand (D)">+ DRAW 1</button>
+                <button onClick={() => drawCard(3)} style={btnStyle(COLORS.border)} title="Draw the top 3 cards of your library">+ DRAW 3</button>
+                <button onClick={untapAll} style={btnStyle(COLORS.border)} title="Untap all permanents without advancing the turn or drawing (U)">↺ UNTAP</button>
+                <button onClick={openTutor} style={btnStyle(COLORS.purple)} title="Search your library by card name, type, or tag — e.g. type 'dork' to find mana creatures (T)">🔍 TUTOR</button>
+                <button onClick={() => openScry(3)} style={btnStyle(COLORS.blue)} title="Look at the top 3 cards of your library. Choose which to keep on top and which to send to the bottom.">👁 SCRY 3</button>
+                <button onClick={() => openScry(1)} style={btnStyle(COLORS.border)} title="Look at the top card of your library and keep or bottom it.">👁 1</button>
                 <button onClick={castYeva}
                   disabled={battlefield.includes("Yeva, Nature's Herald")}
                   title={`Cast Yeva from command zone (${4 + yevaTax} mana)`}
@@ -10572,6 +10885,7 @@ function YevaAdvisor() {
   const [showDeckManager, setShowDeckManager] = useState(false);
   const [showSynergyMap, setShowSynergyMap]   = useState(false);
   const [showGoldfish, setShowGoldfish]       = useState(false);
+  const [showHelp, setShowHelp]               = useState(false);
   const tour = useTour();
 
   // Compute the active deck's card set for filtering
@@ -10622,6 +10936,7 @@ function YevaAdvisor() {
         setShowDebug(false);
         setShowDeckManager(false);
         setShowGoldfish(false);
+        setShowHelp(false);
       }
       // Tab = cycle focus between zone inputs (only when not in an input, or at end of suggestions)
       if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
@@ -10836,7 +11151,7 @@ function YevaAdvisor() {
                 )}
               </div>
             )}
-            <button onClick={() => setShowSavedStates(true)} style={{
+            <button onClick={() => setShowSavedStates(true)} title="Save and reload board state snapshots — useful for testing different lines from the same position (Shift+S)" style={{
               background: "none", border: `1px solid ${COLORS.border}`,
               borderRadius: "6px", padding: "5px 14px",
               color: COLORS.textDim, cursor: "pointer",
@@ -10846,7 +11161,7 @@ function YevaAdvisor() {
               onMouseEnter={e => { e.target.style.borderColor = COLORS.green1; e.target.style.color = COLORS.green1; }}
               onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
             >📌 STATES</button>
-            <button onClick={() => setShowSynergyMap(true)} style={{
+            <button onClick={() => setShowSynergyMap(true)} title="Visual graph showing how cards in your deck connect to combos and each other" style={{
               background: "none", border: `1px solid ${COLORS.border}`,
               borderRadius: "6px", padding: "5px 14px",
               color: COLORS.textDim, cursor: "pointer",
@@ -10856,7 +11171,7 @@ function YevaAdvisor() {
               onMouseEnter={e => { e.target.style.borderColor = "#a569bd"; e.target.style.color = "#a569bd"; }}
               onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
             >⬡ SYNERGY</button>
-            <button onClick={() => setShowGoldfish(true)} style={{
+            <button onClick={() => setShowGoldfish(true)} title="Play through your deck solo to test opening hands, combo consistency, and win speed" style={{
               background: "none", border: `1px solid ${COLORS.border}`,
               borderRadius: "6px", padding: "5px 14px",
               color: COLORS.textDim, cursor: "pointer",
@@ -10866,7 +11181,7 @@ function YevaAdvisor() {
               onMouseEnter={e => { e.target.style.borderColor = COLORS.green2; e.target.style.color = COLORS.green2; }}
               onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
             >🐟 GOLDFISH</button>
-            <button onClick={() => setShowDebug(true)} style={{
+            <button onClick={() => setShowDebug(true)} title="Dump the current application state as JSON for debugging" style={{
               background: "none", border: `1px solid ${COLORS.border}`,
               borderRadius: "6px", padding: "5px 14px",
               color: COLORS.textDim, cursor: "pointer",
@@ -10877,7 +11192,7 @@ function YevaAdvisor() {
               onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
             >⌗ DEBUG</button>
             {/* Deck selector */}
-            <button onClick={() => setShowDeckManager(true)} data-tour="tour-deck" style={{
+            <button onClick={() => setShowDeckManager(true)} data-tour="tour-deck" title="Manage your decks — create, import, edit, and switch between saved decklists" style={{
               background: activeDeck ? "#1a3a1a" : "none",
               border: `1px solid ${activeDeck ? COLORS.green1 : COLORS.border}`,
               borderRadius: "6px", padding: "5px 14px",
@@ -10888,7 +11203,7 @@ function YevaAdvisor() {
             }}>
               📚 {activeDeck ? activeDeck.name : "ALL CARDS"}
             </button>
-            <button onClick={reset} style={{
+            <button onClick={reset} title="Clear the current board state — hand, battlefield, and graveyard" style={{
               background: "none", border: `1px solid ${COLORS.border}`,
               borderRadius: "6px", padding: "5px 14px",
               color: COLORS.textDim, cursor: "pointer",
@@ -10898,7 +11213,7 @@ function YevaAdvisor() {
               onMouseEnter={e => { e.target.style.borderColor = COLORS.red; e.target.style.color = COLORS.red; }}
               onMouseLeave={e => { e.target.style.borderColor = COLORS.border; e.target.style.color = COLORS.textDim; }}
             >↺ RESET</button>
-            <button onClick={tour.start} title="Show tutorial" style={{
+            <button onClick={() => setShowHelp(true)} title="Open manual" style={{
               background: "none", border: `1px solid ${COLORS.border}`,
               borderRadius: "6px", padding: "5px 10px",
               color: COLORS.textDim, cursor: "pointer",
@@ -10910,6 +11225,8 @@ function YevaAdvisor() {
             >?</button>
           </div>
 
+          {/* HELP MODAL */}
+          {showHelp && <HelpModal onClose={() => setShowHelp(false)} onStartTour={() => { setShowHelp(false); tour.start(); }} />}
           {/* SYNERGY MAP MODAL */}
           {showSynergyMap && <SynergyMapModal activeDeck={activeDeck} onClose={() => setShowSynergyMap(false)} />}
           {/* GOLDFISH MODAL */}
