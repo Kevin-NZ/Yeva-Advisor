@@ -5,45 +5,45 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 // ============================================================
 const CARDS = {
   // MANA DORKS (1-drop)
-  "Llanowar Elves":        { type:"creature", cmc:1, tags:["dork","elf","1drop"], tapsFor:1 , devotion:1},
-  "Elvish Mystic":         { type:"creature", cmc:1, tags:["dork","elf","1drop"], tapsFor:1 , devotion:1},
-  "Fyndhorn Elves":        { type:"creature", cmc:1, tags:["dork","elf","1drop"], tapsFor:1 , devotion:1},
-  "Boreal Druid":          { type:"creature", cmc:1, tags:["dork","elf","1drop"], tapsFor:1 , devotion:1},
-  "Birds of Paradise":     { type:"creature", cmc:1, tags:["dork","1drop"], tapsFor:1 , devotion:1},
-  "Arbor Elf":             { type:"creature", cmc:1, tags:["dork","elf","1drop","arbor"], tapsFor:"arbor" , devotion:1, role:"dork-combo"},
-  "Elvish Spirit Guide":   { type:"creature", cmc:2, tags:["dork","elf","free-mana"], tapsFor:1 , devotion:1, role:"fast-mana"},
+  "Llanowar Elves":        { type:"creature", cmc:1, tags:["dork","elf","1drop"], tapsFor:1 , devotion:1, greenPips:1},
+  "Elvish Mystic":         { type:"creature", cmc:1, tags:["dork","elf","1drop"], tapsFor:1 , devotion:1, greenPips:1},
+  "Fyndhorn Elves":        { type:"creature", cmc:1, tags:["dork","elf","1drop"], tapsFor:1 , devotion:1, greenPips:1},
+  "Boreal Druid":          { type:"creature", cmc:1, tags:["dork","elf","1drop"], tapsFor:1 , devotion:1, greenPips:1},
+  "Birds of Paradise":     { type:"creature", cmc:1, tags:["dork","1drop"], tapsFor:1 , devotion:1, greenPips:1},
+  "Arbor Elf":             { type:"creature", cmc:1, tags:["dork","elf","1drop","arbor"], tapsFor:"arbor" , devotion:1, role:"dork-combo", greenPips:1},
+  "Elvish Spirit Guide":   { type:"creature", cmc:2, tags:["dork","elf","free-mana"], tapsFor:1 , devotion:1, role:"fast-mana", greenPips:1},
   "Dryad Arbor":           { type:"land",    cmc:0, tags:["dork","land","forest"], tapsFor:1 , devotion:0},
   // MANA DORKS (2-drop)
-  "Quirion Ranger":        { type:"creature", cmc:1, tags:["combo","elf","untap","ranger"], tapsFor:0 , devotion:1},
-  "Scryb Ranger":          { type:"creature", cmc:2, tags:["combo","elf","untap","ranger","flash"], tapsFor:0 , devotion:1},
-  "Wirewood Symbiote":     { type:"creature", cmc:1, tags:["combo","elf","untap","symbiote"], tapsFor:0 , devotion:1},
+  "Quirion Ranger":        { type:"creature", cmc:1, tags:["combo","elf","untap","ranger"], tapsFor:0 , devotion:1, greenPips:1},
+  "Scryb Ranger":          { type:"creature", cmc:2, tags:["combo","elf","untap","ranger","flash"], tapsFor:0 , devotion:1, greenPips:1},
+  "Wirewood Symbiote":     { type:"creature", cmc:1, tags:["combo","elf","untap","symbiote"], tapsFor:0 , devotion:1, greenPips:1},
   // BIG MANA DORKS
-  "Priest of Titania":     { type:"creature", cmc:2, tags:["dork","elf","big-dork","infinite-dork"], tapsFor:"elves" , devotion:1},
-  "Elvish Archdruid":      { type:"creature", cmc:3, tags:["dork","elf","big-dork","infinite-dork","pump"], tapsFor:"elves" , devotion:2},
-  "Circle of Dreams Druid":{ type:"creature", cmc:3, tags:["dork","elf","big-dork","infinite-dork"], tapsFor:"creatures" , devotion:2},
-  "Karametra's Acolyte":   { type:"creature", cmc:4, tags:["dork","big-dork","infinite-dork","human"], tapsFor:"devotion" , devotion:1},
-  "Fanatic of Rhonas":     { type:"creature", cmc:4, tags:["dork","elf","big-dork","human"], tapsFor:4 , devotion:1, role:"big-dork-combo"},
-  "Hope Tender":           { type:"creature", cmc:2, tags:["dork","elf","human","untap-lands","exert"], tapsFor:1 , devotion:1, role:"untap-combo"},
+  "Priest of Titania":     { type:"creature", cmc:2, tags:["dork","elf","big-dork","infinite-dork"], tapsFor:"elves" , devotion:1, greenPips:1},
+  "Elvish Archdruid":      { type:"creature", cmc:3, tags:["dork","elf","big-dork","infinite-dork","pump"], tapsFor:"elves" , devotion:2, greenPips:1},
+  "Circle of Dreams Druid":{ type:"creature", cmc:3, tags:["dork","elf","big-dork","infinite-dork"], tapsFor:"creatures" , devotion:2, greenPips:1},
+  "Karametra's Acolyte":   { type:"creature", cmc:4, tags:["dork","big-dork","infinite-dork","human"], tapsFor:"devotion" , devotion:1, greenPips:1},
+  "Fanatic of Rhonas":     { type:"creature", cmc:2, tags:["dork","big-dork"], tapsFor:4 , devotion:1, role:"big-dork-combo", note:"Tap for {G, greenPips:1}{G}{G}{G} ({T} trigger). NOT an elf — Wirewood Lodge cannot untap it. Goes infinite with Ashaya+Quirion Ranger (nets {3}) or Ashaya+Scryb Ranger (nets {2}). CMC 2 — Yisan V2."},
+  "Hope Tender":           { type:"creature", cmc:2, tags:["dork","elf","human","untap-lands","exert"], tapsFor:1 , devotion:1, role:"untap-combo", note:"Two tap abilities: {T, greenPips:1}: Add {G}; and Exert — {T}: Untap target land or creature. Human subtype — Kogla's {2} activated ability returns it to hand, resetting the exert. With Yavimaya, can untap Cradle/Nykthos for massive mana."},
   // COMBO PIECES
-  "Ashaya, Soul of the Wild": { type:"creature", cmc:5, tags:["combo","key","ashaya"], tapsFor:0 , devotion:2},
-  "Temur Sabertooth":      { type:"creature", cmc:4, tags:["combo","sabertooth","bounce","protection"] , devotion:2},
-  "Hyrax Tower Scout":     { type:"creature", cmc:3, tags:["combo","scout","untap","human"] , devotion:1},
-  "Argothian Elder":       { type:"creature", cmc:4, tags:["combo","elf","untap-lands"] , devotion:1},
+  "Ashaya, Soul of the Wild": { type:"creature", cmc:5, tags:["combo","key","ashaya"], tapsFor:0 , devotion:2, greenPips:2},
+  "Temur Sabertooth":      { type:"creature", cmc:4, tags:["combo","sabertooth","bounce","protection"] , devotion:2, greenPips:1},
+  "Hyrax Tower Scout":     { type:"creature", cmc:3, tags:["combo","scout","untap","human"] , devotion:1, greenPips:1},
+  "Argothian Elder":       { type:"creature", cmc:4, tags:["combo","elf","untap-lands"] , devotion:1, greenPips:1},
   "Wirewood Lodge":        { type:"land",    cmc:0, tags:["combo","land","untap-elf"] , devotion:0},
-  "Earthcraft":            { type:"enchantment", cmc:2, tags:["combo","enchantment","earthcraft"] , devotion:1},
-  "Kogla, the Titan Ape":  { type:"creature", cmc:6, tags:["combo","finisher","kogla","removal"] , devotion:2},
-  "Eternal Witness":       { type:"creature", cmc:3, tags:["combo","human","recursion","etb"] , devotion:2},
-  "Disciple of Freyalise": { type:"creature", cmc:6, tags:["combo","draw","sacrifice"] , devotion:2},
-  "Glademuse":             { type:"creature", cmc:3, tags:["combo","draw","flash-draw"] , devotion:1},
-  "Beast Whisperer":       { type:"creature", cmc:4, tags:["draw","engine"] , devotion:2},
-  "Regal Force":           { type:"creature", cmc:7, tags:["draw","finisher","etb"] , devotion:3},
-  "Duskwatch Recruiter":   { type:"creature", cmc:2, tags:["combo","tutor","draw"] , devotion:2},
-  "Woodland Bellower":     { type:"creature", cmc:6, tags:["tutor","finisher","etb"] , devotion:2},
+  "Earthcraft":            { type:"enchantment", cmc:2, tags:["combo","enchantment","earthcraft"] , devotion:1, greenPips:1},
+  "Kogla, the Titan Ape":  { type:"creature", cmc:6, tags:["combo","finisher","kogla","removal"] , devotion:2, greenPips:3},
+  "Eternal Witness":       { type:"creature", cmc:3, tags:["combo","human","recursion","etb"] , devotion:2, greenPips:1},
+  "Disciple of Freyalise": { type:"creature", cmc:5, tags:["combo","draw","sacrifice"] , devotion:2, greenPips:2},
+  "Glademuse":             { type:"creature", cmc:3, tags:["combo","draw","flash-draw"] , devotion:1, greenPips:1},
+  "Beast Whisperer":       { type:"creature", cmc:4, tags:["draw","engine"] , devotion:2, greenPips:1},
+  "Regal Force":           { type:"creature", cmc:7, tags:["draw","finisher","etb"] , devotion:3, greenPips:3},
+  "Duskwatch Recruiter":   { type:"creature", cmc:2, tags:["combo","tutor","draw"] , devotion:2, greenPips:1},
+  "Woodland Bellower":     { type:"creature", cmc:6, tags:["tutor","finisher","etb"] , devotion:2, greenPips:2},
   // LANDS
   "Gaea's Cradle":         { type:"land", cmc:0, tags:["land","combo","key","cradle"] , devotion:0},
   "Nykthos, Shrine to Nyx":{ type:"land", cmc:0, tags:["land","combo","nykthos"] , devotion:0},
   "Itlimoc, Cradle of the Sun": { type:"land", cmc:0, tags:["land","combo","itlimoc"] , devotion:0},
-  "Growing Rites of Itlimoc":   { type:"enchantment", cmc:4, tags:["land","combo","itlimoc","draw"] , devotion:1},
+  "Growing Rites of Itlimoc":   { type:"enchantment", cmc:4, tags:["land","combo","itlimoc","draw"] , devotion:1, transformsTo:"Itlimoc, Cradle of the Sun", greenPips:2},
   "Deserted Temple":       { type:"land", cmc:0, tags:["land","combo","untap-land"] , devotion:0},
   "Yavimaya, Cradle of Growth": { type:"land", cmc:0, tags:["land","combo","forestwalk"] , devotion:0},
   "Ancient Tomb":          { type:"land", cmc:0, tags:["land","fast-mana"] , devotion:0},
@@ -60,74 +60,74 @@ const CARDS = {
   "Urza's Cave":           { type:"land", cmc:0, tags:["land","tutor"] , devotion:0},
   "Forest":                { type:"land", cmc:0, tags:["land","basic","forest"] , devotion:0},
   // ACCELERANTS
-  "Sol Ring":              { type:"artifact", cmc:1, tags:["rock","fast-mana"] , devotion:0},
-  "Chrome Mox":            { type:"artifact", cmc:0, tags:["rock","fast-mana","mox"] , devotion:0},
-  "Mox Diamond":           { type:"artifact", cmc:0, tags:["rock","fast-mana","mox"] , devotion:0},
-  "Lotus Petal":           { type:"artifact", cmc:0, tags:["rock","fast-mana"] , devotion:0},
-  "Utopia Sprawl":         { type:"enchantment", cmc:1, tags:["enchant-land","ramp","aura"] , devotion:1},
-  "Wild Growth":           { type:"enchantment", cmc:1, tags:["enchant-land","ramp","aura"] , devotion:1},
-  "Elvish Guidance":       { type:"enchantment", cmc:3, tags:["enchant-land","ramp","aura","elf-synergy"], devotion:1, role:"elf-mana"},
+  "Sol Ring":              { type:"artifact", cmc:1, tags:["rock","fast-mana"] , devotion:0, greenPips:0},
+  "Chrome Mox":            { type:"artifact", cmc:0, tags:["rock","fast-mana","mox"] , devotion:0, greenPips:0},
+  "Mox Diamond":           { type:"artifact", cmc:0, tags:["rock","fast-mana","mox"] , devotion:0, greenPips:0},
+  "Lotus Petal":           { type:"artifact", cmc:0, tags:["rock","fast-mana"] , devotion:0, greenPips:0},
+  "Utopia Sprawl":         { type:"enchantment", cmc:1, tags:["enchant-land","ramp","aura"] , devotion:1, greenPips:1},
+  "Wild Growth":           { type:"enchantment", cmc:1, tags:["enchant-land","ramp","aura"] , devotion:1, greenPips:1},
+  "Elvish Guidance":       { type:"enchantment", cmc:3, tags:["enchant-land","ramp","aura","elf-synergy"], devotion:1, role:"elf-mana", greenPips:1},
   // STAX / INTERACTION
-  "Collector Ouphe":       { type:"creature", cmc:2, tags:["stax","hate"] , devotion:1},
-  "Destiny Spinner":       { type:"creature", cmc:2, tags:["protection","stax"] , devotion:1, role:"haste-protection"},
-  "Allosaurus Shepherd":   { type:"creature", cmc:1, tags:["protection","elf"] , devotion:1},
-  "Heartwood Storyteller": { type:"creature", cmc:3, tags:["stax","draw"] , devotion:2},
-  "Seedborn Muse":         { type:"creature", cmc:5, tags:["engine","untap-all"] , devotion:2},
-  "Eladamri, Korvecdal":   { type:"creature", cmc:4, tags:["finisher","forestwalk","protection"] , devotion:2},
+  "Collector Ouphe":       { type:"creature", cmc:2, tags:["stax","hate"] , devotion:1, greenPips:1},
+  "Destiny Spinner":       { type:"creature", cmc:2, tags:["protection","stax"] , devotion:1, role:"haste-protection", greenPips:1},
+  "Allosaurus Shepherd":   { type:"creature", cmc:1, tags:["protection","elf"] , devotion:1, greenPips:1},
+  "Heartwood Storyteller": { type:"creature", cmc:3, tags:["stax","draw"] , devotion:2, greenPips:1},
+  "Seedborn Muse":         { type:"creature", cmc:5, tags:["engine","untap-all"] , devotion:2, greenPips:2},
+  "Eladamri, Korvecdal":   { type:"creature", cmc:3, tags:["finisher","library-cast","tutor","elf"] , devotion:2, role:"library-engine", note:"Look at top of library any time. Cast creature spells from top of library. {G, greenPips:1},{T}, tap two untapped creatures: reveal top of library or a card from hand — if a creature, put it onto the battlefield. Powerful library-sifting and creature-cheat engine."},
   // TUTORS
-  "Worldly Tutor":         { type:"instant", cmc:1, tags:["tutor","instant"] , devotion:0},
-  "Chord of Calling":      { type:"instant", cmc:3, tags:["tutor","instant","convoke"] , devotion:0},
-  "Summoner's Pact":       { type:"instant", cmc:0, tags:["tutor","instant","free"] , devotion:0},
-  "Shared Summons":        { type:"instant", cmc:5, tags:["tutor","instant","two-creatures"] , devotion:0},
-  "Green Sun's Zenith":    { type:"sorcery", cmc:1, tags:["tutor","sorcery"] , devotion:0},
-  "Natural Order":         { type:"sorcery", cmc:4, tags:["tutor","sorcery","sacrifice"] , devotion:0},
-  "Eldritch Evolution":    { type:"sorcery", cmc:3, tags:["tutor","sorcery","sacrifice"] , devotion:0},
-  "Fierce Empath":         { type:"creature", cmc:3, tags:["tutor","elf","etb"] , devotion:1},
-  "Elvish Harbinger":      { type:"creature", cmc:3, tags:["tutor","elf","dork"] , devotion:1},
-  "Fauna Shaman":          { type:"creature", cmc:2, tags:["tutor","elf","engine"] , devotion:1},
-  "Survival of the Fittest":{ type:"enchantment", cmc:2, tags:["tutor","engine","survival"] , devotion:1},
-  "Crop Rotation":         { type:"instant", cmc:1, tags:["tutor","land","instant"] , devotion:0},
-  "Sylvan Scrying":        { type:"sorcery", cmc:2, tags:["tutor","land"] , devotion:0},
-  "Archdruid's Charm":     { type:"instant", cmc:3, tags:["tutor","land","removal","instant"] , devotion:0},
+  "Worldly Tutor":         { type:"instant", cmc:1, tags:["tutor","instant"] , devotion:0, greenPips:1},
+  "Chord of Calling":      { type:"instant", cmc:3, tags:["tutor","instant","convoke"] , devotion:0, greenPips:3},
+  "Summoner's Pact":       { type:"instant", cmc:0, tags:["tutor","instant","free"] , devotion:0, greenPips:0},
+  "Shared Summons":        { type:"instant", cmc:5, tags:["tutor","instant","two-creatures"] , devotion:0, greenPips:2},
+  "Green Sun's Zenith":    { type:"sorcery", cmc:1, tags:["tutor","sorcery"] , devotion:0, greenPips:1},
+  "Natural Order":         { type:"sorcery", cmc:4, tags:["tutor","sorcery","sacrifice"] , devotion:0, greenPips:2},
+  "Eldritch Evolution":    { type:"sorcery", cmc:3, tags:["tutor","sorcery","sacrifice"] , devotion:0, greenPips:1},
+  "Fierce Empath":         { type:"creature", cmc:3, tags:["tutor","elf","etb"] , devotion:1, greenPips:1},
+  "Elvish Harbinger":      { type:"creature", cmc:3, tags:["tutor","elf","dork"] , devotion:1, greenPips:1},
+  "Fauna Shaman":          { type:"creature", cmc:2, tags:["tutor","elf","engine"] , devotion:1, greenPips:1},
+  "Survival of the Fittest":{ type:"enchantment", cmc:2, tags:["tutor","engine","survival"] , devotion:1, greenPips:1},
+  "Crop Rotation":         { type:"instant", cmc:1, tags:["tutor","land","instant"] , devotion:0, greenPips:1},
+  "Sylvan Scrying":        { type:"sorcery", cmc:2, tags:["tutor","land"] , devotion:0, greenPips:1},
+  "Archdruid's Charm":     { type:"instant", cmc:3, tags:["tutor","land","removal","instant"] , devotion:0, greenPips:1},
   // INTERACTION / UTILITY
-  "Beast Within":          { type:"instant", cmc:3, tags:["removal","instant"] , devotion:0},
-  "Force of Vigor":        { type:"instant", cmc:4, tags:["removal","instant","free"] , devotion:0},
-  "Endurance":             { type:"creature", cmc:3, tags:["hate","flash","etb","self-protection"] , devotion:1},
-  "Infectious Bite":       { type:"instant", cmc:2, tags:["removal","poison","win-con"] , devotion:0},
-  "Legolas's Quick Reflexes":{ type:"instant", cmc:1, tags:["utility","haste","draw"] , devotion:0},
-  "Nature's Rhythm":       { type:"enchantment", cmc:2, tags:["draw","engine","land-draw"] , devotion:1, role:"land-draw"},
+  "Beast Within":          { type:"instant", cmc:3, tags:["removal","instant"] , devotion:0, greenPips:1},
+  "Force of Vigor":        { type:"instant", cmc:4, tags:["removal","instant","free"] , devotion:0, greenPips:2},
+  "Endurance":             { type:"creature", cmc:3, tags:["hate","flash","etb","self-protection"] , devotion:1, greenPips:1},
+  "Infectious Bite":       { type:"instant", cmc:2, tags:["removal","poison","win-con"] , devotion:0, greenPips:1},
+  "Legolas's Quick Reflexes":{ type:"instant", cmc:1, tags:["utility","split-second","untap","removal"] , devotion:0, greenPips:1},
+  "Nature's Rhythm":       { type:"sorcery", cmc:2, tags:["tutor","sorcery","harmonize"] , devotion:0, role:"creature-tutor", note:"Sorcery {X, greenPips:2}{G}{G}: search your library for a creature with MV ≤ X, put it onto the battlefield. Harmonize {X}{G}{G}{G}{G}: cast from graveyard (tap creatures to reduce generic cost by their power), then exile. Effectively two creature tutors — cast normally then Harmonize once from the graveyard."},
   // OTHER UTILITY
-  "Yisan, the Wanderer Bard": { type:"creature", cmc:3, tags:["tutor","engine","yisan"] , devotion:1},
-  "Magus of the Candelabra": { type:"creature", cmc:1, tags:["combo","untap-lands"] , devotion:1},
-  "Tireless Provisioner":  { type:"creature", cmc:3, tags:["combo","landfall","treasure"] , devotion:1, role:"ramp-combo"},
-  "Badgermole Cub":        { type:"creature", cmc:2, tags:["combo","mana-doubler"] , devotion:1, role:"haste-combo"},
-  "Woodcaller Automaton":  { type:"creature", cmc:8, tags:["combo","untap-land"] , devotion:2},
-  "Sowing Mycospawn":      { type:"creature", cmc:5, tags:["removal","land-tutor"] , devotion:1},
-  "Formidable Speaker":    { type:"creature", cmc:3, tags:["combo","tutor","untap","elf"] , devotion:1},
-  "Chomping Changeling":   { type:"creature", cmc:3, tags:["elf","changeling"] , devotion:1},
-  "Delighted Halfling":    { type:"creature", cmc:2, tags:["dork","protection"] , devotion:1, role:"protection"},
-  "Elvish Reclaimer":      { type:"creature", cmc:1, tags:["land-tutor","elf","1drop"] , devotion:1},
-  "Yeva, Nature's Herald": { type:"creature", cmc:4, tags:["commander","flash-enabler"] , devotion:2},
+  "Yisan, the Wanderer Bard": { type:"creature", cmc:3, tags:["tutor","engine","yisan"] , devotion:1, greenPips:1},
+  "Magus of the Candelabra": { type:"creature", cmc:1, tags:["combo","untap-lands"] , devotion:1, greenPips:1},
+  "Tireless Provisioner":  { type:"creature", cmc:3, tags:["combo","landfall","treasure"] , devotion:1, role:"ramp-combo", greenPips:1},
+  "Badgermole Cub":        { type:"creature", cmc:2, tags:["combo","mana-doubler"] , devotion:1, role:"haste-combo", greenPips:1},
+  "Woodcaller Automaton":  { type:"creature", cmc:10, tags:["combo","untap-land"] , devotion:2, greenPips:2},
+  "Sowing Mycospawn":      { type:"creature", cmc:4, tags:["removal","land-tutor"] , devotion:1, greenPips:1},
+  "Formidable Speaker":    { type:"creature", cmc:3, tags:["combo","tutor","untap","elf"] , devotion:1, greenPips:1},
+  "Chomping Changeling":   { type:"creature", cmc:3, tags:["elf","changeling"] , devotion:1, greenPips:1},
+  "Delighted Halfling":    { type:"creature", cmc:1, tags:["dork","protection"] , devotion:1, role:"protection", note:"{T, greenPips:1}: Add {C}. {T}: Add one mana of any color — spend it only to cast a legendary spell, and that spell can't be countered when cast this way. Protects Yeva, Ashaya, Yisan — key against blue interaction. CMC 1, so it's a true 1-drop protection piece."},
+  "Elvish Reclaimer":      { type:"creature", cmc:1, tags:["land-tutor","elf","1drop"] , devotion:1, greenPips:1},
+  "Yeva, Nature's Herald": { type:"creature", cmc:4, tags:["commander","flash-enabler"] , devotion:2, greenPips:2},
 
   // ── VARIANT / SIDEBOARD CARDS ──────────────────────────────────────────
   // Mana dorks & big dorks
-  "Joraga Treespeaker":    { type:"creature", cmc:1, tags:["dork","elf","1drop","big-dork","infinite-dork"], tapsFor:"elves", devotion:1, role:"dork-combo"},
-  "Marwyn, the Nurturer":  { type:"creature", cmc:3, tags:["dork","elf","big-dork","infinite-dork","human"], tapsFor:"elves", devotion:1, role:"big-dork-combo"},
-  "Selvala, Heart of the Wilds": { type:"creature", cmc:3, tags:["dork","elf","big-dork","human"], tapsFor:"power", devotion:2, role:"big-dork-combo"},
-  "Wirewood Channeler":    { type:"creature", cmc:4, tags:["dork","elf","big-dork","infinite-dork"], tapsFor:"elves", devotion:1, role:"big-dork-combo"},
-  "Defiler of Vigor":      { type:"creature", cmc:5, tags:["combo","storm","phyrexian"], devotion:4, role:"storm-engine"},
+  "Joraga Treespeaker":    { type:"creature", cmc:1, tags:["dork","elf","1drop","big-dork","infinite-dork"], tapsFor:"elves", devotion:1, role:"dork-combo", greenPips:1},
+  "Marwyn, the Nurturer":  { type:"creature", cmc:3, tags:["dork","elf","big-dork","infinite-dork","human"], tapsFor:"elves", devotion:1, role:"big-dork-combo", greenPips:1},
+  "Selvala, Heart of the Wilds": { type:"creature", cmc:3, tags:["dork","elf","big-dork","human"], tapsFor:"power", devotion:2, role:"big-dork-combo", greenPips:1},
+  "Wirewood Channeler":    { type:"creature", cmc:4, tags:["dork","elf","big-dork","infinite-dork"], tapsFor:"elves", devotion:1, role:"big-dork-combo", greenPips:1},
+  "Defiler of Vigor":      { type:"creature", cmc:5, tags:["combo","storm","phyrexian"], devotion:4, role:"storm-engine", greenPips:2},
   // Untap & haste combo pieces
-  "Ley Weaver":            { type:"creature", cmc:4, tags:["combo","human","untap-lands"], devotion:1, role:"untap-combo"},
-  "Cloudstone Curio":      { type:"artifact", cmc:3, tags:["combo","bounce","sabertooth"], devotion:0, role:"bounce-combo"},
-  "Thousand-Year Elixir":  { type:"artifact", cmc:3, tags:["combo","haste","untap"], devotion:0, role:"haste-combo"},
-  "Concordant Crossroads": { type:"enchantment", cmc:1, tags:["combo","haste","enchantment"], devotion:1, role:"haste-enabler"},
-  "Surrak and Goreclaw":   { type:"creature", cmc:5, tags:["combo","haste","pump"], devotion:2, role:"haste-enabler"},
-  "Touch of Vitae":        { type:"instant", cmc:2, tags:["combo","haste","untap","instant"], devotion:0, role:"haste-combo"},
-  "Ulvenwald Oddity":      { type:"creature", cmc:4, tags:["combo","haste","mana-sink"], devotion:2, role:"haste-enabler"},
-  "Vitalize":              { type:"instant", cmc:1, tags:["combo","untap","storm","instant"], devotion:0, role:"storm-ritual"},
-  "Leyline of Abundance":  { type:"enchantment", cmc:4, tags:["combo","ramp","elf-synergy","enchantment"], devotion:2, role:"mana-boost"},
-  "Great Oak Guardian":    { type:"creature", cmc:6, tags:["combo","flash","pump","untap"], devotion:2, role:"flash-combo"},
-  "Genesis Hydra":         { type:"creature", cmc:2, tags:["combo","outlet","etb"], devotion:1, role:"infinite-outlet"},
+  "Ley Weaver":            { type:"creature", cmc:4, tags:["combo","human","untap-lands"], devotion:1, role:"untap-combo", greenPips:1},
+  "Cloudstone Curio":      { type:"artifact", cmc:3, tags:["combo","bounce","sabertooth"], devotion:0, role:"bounce-combo", greenPips:0},
+  "Thousand-Year Elixir":  { type:"artifact", cmc:3, tags:["combo","haste","untap"], devotion:0, role:"haste-combo", greenPips:0},
+  "Concordant Crossroads": { type:"enchantment", cmc:1, tags:["combo","haste","enchantment"], devotion:1, role:"haste-enabler", greenPips:1},
+  "Surrak and Goreclaw":   { type:"creature", cmc:5, tags:["combo","haste","pump"], devotion:2, role:"haste-enabler", greenPips:1},
+  "Touch of Vitae":        { type:"instant", cmc:2, tags:["combo","haste","untap","instant"], devotion:0, role:"haste-combo", greenPips:1},
+  "Ulvenwald Oddity":      { type:"creature", cmc:4, tags:["combo","haste","mana-sink"], devotion:2, role:"haste-enabler", greenPips:1},
+  "Vitalize":              { type:"instant", cmc:1, tags:["combo","untap","storm","instant"], devotion:0, role:"storm-ritual", greenPips:1},
+  "Leyline of Abundance":  { type:"enchantment", cmc:4, tags:["combo","ramp","elf-synergy","enchantment"], devotion:2, role:"mana-boost", greenPips:2},
+  "Great Oak Guardian":    { type:"creature", cmc:6, tags:["combo","flash","pump","untap"], devotion:2, role:"flash-combo", greenPips:2},
+  "Genesis Hydra":         { type:"creature", cmc:2, tags:["combo","outlet","etb"], devotion:1, role:"infinite-outlet", greenPips:1},
   "Agatha's Soul Cauldron":{ type:"artifact", cmc:2, tags:["combo","graveyard","recursion"], devotion:0, role:"graveyard-engine"},
   "Beastrider Vanguard":   { type:"creature", cmc:3, tags:["combo","outlet","mana-sink"], devotion:1, role:"infinite-outlet"},
   "Lotus Cobra":           { type:"creature", cmc:2, tags:["combo","landfall","ramp"], devotion:1, role:"ramp-combo"},
@@ -269,17 +269,17 @@ const COMBOS = [
     name: "Ashaya + Argothian Elder (2-Card Infinite Mana!)",
     onBattlefield: ["Ashaya, Soul of the Wild", "Argothian Elder"],
     mustPreExist: ["Argothian Elder"],
-    description: "Infinite mana with only 2 cards. Ashaya turns Argothian Elder into a Forest/land, allowing Elder to target itself with its 'untap two lands' ability. Tap Elder as a land for {G} (via Ashaya making it a Forest), then activate Elder's untap ability targeting itself + any other land. Elder untaps, tap it again for {G}. Repeat.",
+    description: "Infinite mana with only 2 cards. Ashaya turns Argothian Elder into a Forest/land. Elder's tap ability untaps two target lands — and can target ITSELF (since it's a land via Ashaya). Tap Elder for the untap ability (targeting Elder + any other land): Elder re-untaps itself, and the second land also untaps. Then tap that second land for mana. Repeat forever.",
     requires: ["Ashaya, Soul of the Wild", "Argothian Elder"],
     priority: 10,
     type: "infinite-mana",
     lines: [
-      "Ashaya in play — Argothian Elder is now a Forest land (taps for {G} like any Forest).",
-      "Tap Argothian Elder for {G} (its Forest mana ability via Ashaya).",
-      "Activate Argothian Elder's tap ability ({T}): untap two target lands — target itself AND any other land.",
-      "Elder resolves: it untaps itself. It is now untapped again and ready.",
-      "Tap Elder for {G} again. Also tap the second untapped land for bonus mana. Repeat for infinite {G}.",
-      "This is a clean 2-card combo. The second land untapped each loop is a free bonus.",
+      "Ashaya in play — Argothian Elder is now a Forest land.",
+      "Activate Argothian Elder's tap ability ({T}): untap two target lands — target ELDER ITSELF and any other land you control.",
+      "Elder taps (ability cost), then the effect untaps Elder. Elder is back to untapped. The second land also untaps.",
+      "Tap that second land for N mana (even 1 Forest = {G} per loop).",
+      "Repeat from step 2 — Elder is untapped and ready again.",
+      "This is a clean 2-card combo. Each loop Elder re-untaps itself for free; all mana comes from the second land.",
     ]
   },
 
@@ -327,50 +327,28 @@ const COMBOS = [
     ]
   },
 
-  // ── 5. Earthcraft + Ashaya + Quirion Ranger + Yavimaya ────────────────
+  // ── 5. Earthcraft + Ashaya + Quirion/Scryb Ranger + Yavimaya ─────────
   // IMPORTANT: Ashaya makes creatures Forest lands but NOT basic lands.
   // Earthcraft requires "basic land" — needs Yavimaya to make lands basic Forests.
+  // Quirion Ranger variant: costs {G} to recast, needs 1 Earthcraft target per loop.
+  // Scryb Ranger variant: costs {1}{G} to recast (needs 2 Earthcraft targets), but has flash.
   {
-    id: "earthcraft_ashaya_quirion",
-    name: "Earthcraft + Ashaya + Quirion Ranger + Yavimaya",
-    onBattlefield: ["Earthcraft", "Ashaya, Soul of the Wild", "Quirion Ranger", "Yavimaya, Cradle of Growth"],
-    description: "Infinite mana. Earthcraft requires basic lands — Ashaya makes creatures Forest lands but NOT basic. Yavimaya, Cradle of Growth fixes this by making all lands (including creature-lands) basic Forests. With Yavimaya + Ashaya, tap Quirion Ranger as a Forest for {G}, tap another creature via Earthcraft to untap a basic Forest (=any creature via Yavimaya+Ashaya), bounce Ranger to untap the dork, recast — net {G} each loop.",
-    requires: ["Earthcraft", "Ashaya, Soul of the Wild", "Quirion Ranger", "Yavimaya, Cradle of Growth"],
+    id: "earthcraft_ashaya_ranger",
+    name: "Earthcraft + Ashaya + Quirion/Scryb Ranger + Yavimaya",
+    onBattlefield: ["Earthcraft", "Ashaya, Soul of the Wild", "Yavimaya, Cradle of Growth"],
+    description: "Infinite mana. Earthcraft requires basic lands — Ashaya makes creatures Forest lands but NOT basic. Yavimaya fixes this by making all lands (including Ashaya creature-lands) basic Forests. Quirion Ranger (recast {G}, 1 Earthcraft target) or Scryb Ranger (recast {1}{G}, 2 targets, has flash) both work. Net {G} per loop.",
+    requires: ["Earthcraft", "Ashaya, Soul of the Wild", "Yavimaya, Cradle of Growth"],
+    needsRanger: true,
     priority: 9,
     type: "infinite-mana",
     lines: [
-      "Earthcraft + Ashaya + Quirion Ranger + Yavimaya, Cradle of Growth + at least one other creature on battlefield.",
-      "WHY YAVIMAYA: Ashaya makes creatures Forest lands but not BASIC lands. Earthcraft needs basic lands. Yavimaya makes all lands basic Forests — including creature-lands via Ashaya.",
-      "Tap Quirion Ranger as a Forest (via Ashaya+Yavimaya) for {G}.",
-      "Tap another creature to Earthcraft: untap a basic Forest (all creature-lands are basic via Yavimaya) — untap Quirion Ranger.",
-      "Activate Quirion Ranger: return itself to hand, untapping any other creature.",
-      "Recast Quirion Ranger for {G}. Net: {G} per loop.",
+      "Earthcraft + Ashaya + Yavimaya + Quirion Ranger OR Scryb Ranger on battlefield.",
+      "WHY YAVIMAYA: Ashaya makes creatures Forests but not BASIC. Earthcraft needs basic lands. Yavimaya makes all lands basic Forests — including creature-lands.",
+      "QUIRION variant (1 Earthcraft target per loop): Tap Quirion Ranger as a Forest for {G}. Tap one creature via Earthcraft to untap Quirion Ranger. Activate Ranger: return itself to hand, untapping any creature. Recast for {G}. Net: {G} per loop.",
+      "SCRYB variant (flash! 2 Earthcraft targets per loop): Tap Scryb Ranger as a Forest for {G}. Tap two creatures via Earthcraft to untap Scryb Ranger + one other. Activate Ranger: return itself to hand, untapping any creature. Recast for {1}{G}. Net: {G} per loop — goes off at instant speed on any opponent's turn.",
       "Repeat for infinite green mana.",
     ]
   },
-
-  // ── 5b. Earthcraft + Ashaya + Scryb Ranger + Yavimaya (Flash! Instant Speed) ─
-  // Same Yavimaya requirement as Quirion variant — Ashaya creatures are non-basic.
-  {
-    id: "earthcraft_ashaya_scryb",
-    name: "Earthcraft + Ashaya + Scryb Ranger + Yavimaya (Instant Speed!)",
-    onBattlefield: ["Earthcraft", "Ashaya, Soul of the Wild", "Scryb Ranger", "Yavimaya, Cradle of Growth"],
-    description: "Infinite mana at instant speed. Same as the Quirion Ranger variant but Scryb Ranger has flash — goes off on any opponent's turn without needing Yeva. Requires Yavimaya to make creature-lands basic (Ashaya alone is not enough for Earthcraft). Costs {1}{G} to recast, so needs two Earthcraft targets per loop.",
-    requires: ["Earthcraft", "Ashaya, Soul of the Wild", "Scryb Ranger", "Yavimaya, Cradle of Growth"],
-    priority: 9,
-    type: "infinite-mana",
-    lines: [
-      "Earthcraft + Ashaya + Scryb Ranger + Yavimaya + at least two other creatures on battlefield.",
-      "KEY ADVANTAGE: Scryb Ranger has flash — this loop works on any player's turn without Yeva.",
-      "WHY YAVIMAYA: Ashaya makes creatures Forest lands but not BASIC. Yavimaya makes all lands basic Forests.",
-      "Tap Scryb Ranger as a Forest for {G}.",
-      "Tap two creatures to Earthcraft: untap two basic Forests (all creature-lands are basic via Yavimaya+Ashaya), untapping Scryb Ranger and one other creature.",
-      "Activate Scryb Ranger: return itself to hand, untapping any creature.",
-      "Recast Scryb Ranger for {1}{G}. Net: {G} per loop.",
-      "Repeat for infinite green mana at instant speed.",
-    ]
-  },
-
   // ── 6. Magus of the Candelabra + Ashaya + Dork/Land (≥3 mana) ─────────
   {
     id: "magus_ashaya",
@@ -417,7 +395,7 @@ const COMBOS = [
     id: "sabertooth_scout",
     name: "Temur Sabertooth / Kogla + Hyrax Tower Scout + Dork (≥6 mana)",
     onBattlefield: ["Hyrax Tower Scout"],
-    description: "Infinite mana. Scout's ETB untaps a creature. Bounce Scout with Sabertooth/Kogla, recast it to untap the big dork. Loop cost: {1}{G} bounce + {2} recast = {3}{G}. Net positive when dork produces ≥6 (need 1 left over for loop mana).",
+    description: "Infinite mana. Scout's ETB untaps a creature. Bounce Scout with Sabertooth/Kogla, recast it to untap the big dork. Loop cost: {1}{G} bounce + {2}{G} recast = 5 mana total. Net positive when dork produces ≥6.",
     requires: ["Hyrax Tower Scout"],
     needsBigDork: 6,
     needsAlsoBouncer: true,
@@ -427,8 +405,8 @@ const COMBOS = [
       "Temur Sabertooth (or Kogla) + Hyrax Tower Scout + dork tapping for ≥6 on battlefield.",
       "Tap the big dork for ≥6 mana.",
       "Pay {1}{G}: Sabertooth bounces Hyrax Tower Scout to hand. (Or Kogla returns it as a Human.)",
-      "Recast Hyrax Tower Scout ({2}): ETB untaps the big dork.",
-      "Total cost per loop: {1}{G}+{2} = {3}{G}. Net: ≥{G} when dork taps for ≥6.",
+      "Recast Hyrax Tower Scout ({2}{G}): ETB untaps the big dork.",
+      "Total cost per loop: {1}{G} bounce + {2}{G} recast = 5 mana. Net: ≥{G} when dork taps for ≥6.",
       "Repeat for infinite mana.",
     ]
   },
@@ -673,31 +651,30 @@ const COMBOS = [
       "Infinite mana established. Disciple of Freyalise + Temur Sabertooth on battlefield (Disciple is an Elf, not a Human — Kogla cannot bounce it).",
       "Disciple ETB: each opponent sacrifices a creature. Then you draw cards equal to creatures you control.",
       "Pay {1}{G}: Temur Sabertooth bounces Disciple to hand.",
-      "Recast Disciple ({5}{G}): ETB again — each opponent sacrifices another creature, you draw again.",
+      "Recast Disciple ({4}{G}): ETB again — each opponent sacrifices another creature, you draw again.",
       "Loop to clear all opposing creatures. Stop drawing once you find Duskwatch Recruiter or another win outlet.",
       "Win via Duskwatch Recruiter activation loop → Sanitarium mill.",
     ]
   },
 
-  // ── WIN CON: Elvish Archdruid + Eladamri + Yavimaya (Pump Combat Win) ──
+  // ── WIN CON: Elvish Archdruid + Eladamri + Yavimaya (Pump + Library-Cheat Win) ──
   {
     id: "archdruid_eladamri_pump",
-    name: "Elvish Archdruid + Eladamri + Yavimaya (Infinite Pump Combat Win)",
-    onBattlefield: ["Elvish Archdruid", "Eladamri, Korvecdal", "Yavimaya, Cradle of Growth"],
+    name: "Elvish Archdruid Pump + Eladamri (Infinite Pump Combat Win)",
+    onBattlefield: ["Elvish Archdruid", "Eladamri, Korvecdal"],
     mustPreExist: ["Elvish Archdruid"],
-    description: "With infinite mana: Elvish Archdruid's second ability ({T}: all elves get +N/+N until end of turn, where N = elves you control) can be activated infinitely via bouncing Archdruid. Combined with Eladamri's forestwalk (unblockable) and Yavimaya (all lands are Forests), your entire elf army becomes infinitely large and completely unblockable.",
-    requires: ["Elvish Archdruid", "Eladamri, Korvecdal", "Yavimaya, Cradle of Growth"],
+    description: "With infinite mana: Elvish Archdruid's tap ability gives all elves +N/+N until end of turn (N = elves you control). Activate repeatedly (bouncing Archdruid with Temur Sabertooth) to stack infinite pump. Eladamri's library-casting engine helps assemble the board — activate his ability to cheat the top creature into play before attacking for lethal.",
+    requires: ["Elvish Archdruid", "Eladamri, Korvecdal"],
     needsInfiniteMana: true,
     priority: 10,
     type: "win-combat",
     lines: [
-      "Infinite mana active. Elvish Archdruid + Eladamri, Korvecdal + Yavimaya, Cradle of Growth on battlefield.",
-      "Yavimaya: all lands are Forests for all players — opponents always have a Forest.",
-      "Eladamri: all your creatures have forestwalk (unblockable vs players controlling a Forest) AND shroud from opponents' spells and abilities.",
-      "Tap Elvish Archdruid: all elves you control get +N/+N until end of turn (N = elf count). With infinite mana, repeat this multiple times or use a bounce loop.",
-      "With Temur Sabertooth: bounce Archdruid, recast, activate again — stacks pump on all elves infinitely.",
-      "Attack with your infinitely large, completely unblockable, shrouded elf army. All opponents take lethal simultaneously.",
-      "TIP: You only need pump equal to your opponents' life totals — no need to loop more than necessary.",
+      "Infinite mana active. Elvish Archdruid + Eladamri, Korvecdal on battlefield.",
+      "Tap Elvish Archdruid: all elves you control get +N/+N until end of turn (N = elves on board).",
+      "With Temur Sabertooth: pay {1}{G} to bounce Archdruid, recast, activate again — stack unlimited +N/+N on all elves.",
+      "Eladamri: {G}, {T}, tap two untapped creatures — put any creature from top of library or hand directly onto battlefield. Use to add more elves for greater pump.",
+      "Once elves are large enough: attack for lethal across all opponents.",
+      "TIP: You only need pump equal to your opponents' remaining life totals — no need to loop more than necessary.",
     ]
   },
 
@@ -732,6 +709,7 @@ const COMBOS = [
     description: "Requires infinite mana. Cast Infectious Bite 10 times via Eternal Witness recursion. Each cast gives every opponent 1 poison counter. 10 poison counters = loss. Works with Sabertooth (bounce Witness) or Kogla (return Witness as Human on attack).",
     requires: ["Infectious Bite", "Eternal Witness"],
     needsAlsoBouncer: true,
+    needsInfiniteMana: true,
     priority: 9,
     type: "win-poison",
     lines: [
@@ -752,7 +730,7 @@ const COMBOS = [
     description: "Win condition. Badgermole Cub ETB: earthbend 1 — target land becomes a 0/0 creature with haste, gets a +1/+1 counter. KEY RULE: you can target a land that is ALREADY animated — it just gets another +1/+1 counter each time. With a bouncer (Temur Sabertooth or Kogla) and infinite mana: bounce Badgermole Cub to hand, recast ({1}{G}), ETB targets the same already-animated land again. Repeat infinitely — the land-creature accumulates infinite counters. Attack for lethal. Bonus: Badgermole's static 'Whenever you tap a creature for mana, add {G}' sustains and amplifies mana loops throughout.",
     requires: ["Badgermole Cub"],
     needsInfiniteMana: true,
-    needsBouncer: true,
+    needsAlsoBouncer: true,
     priority: 11,
     type: "win-combat",
     lines: [
@@ -785,20 +763,22 @@ const COMBOS = [
     ]
   },
 
-  // ── WIN CON: Eladamri + Yavimaya Combat ───────────────────────────────
+  // ── ENGINE: Eladamri, Korvecdal (Library Casting Engine) ─────────────────────
   {
     id: "eladamri_yavimaya",
-    name: "Eladamri + Yavimaya (Unblockable Army — Combat Win)",
-    onBattlefield: ["Eladamri, Korvecdal", "Yavimaya, Cradle of Growth"],
-    description: "Non-infinite but game-winning. Yavimaya makes all lands Forests for all players. Eladamri gives all your creatures forestwalk and shroud from opponents. Since all opponents always control a Forest (Yavimaya), your entire army is completely unblockable and untargetable.",
-    requires: ["Eladamri, Korvecdal", "Yavimaya, Cradle of Growth"],
+    name: "Eladamri, Korvecdal (Library Casting Engine)",
+    onBattlefield: ["Eladamri, Korvecdal"],
+    description: "Eladamri lets you look at the top of your library at any time and cast creature spells from the top of your library. His activated ability ({G},{T}, tap two untapped creatures) cheats the top card or a card from hand directly onto the battlefield. With infinite mana and a board of creatures, he acts as a repeating creature-into-play engine — effectively a free Chord of Calling every activation.",
+    requires: ["Eladamri, Korvecdal"],
     priority: 6,
-    type: "win-combat",
+    type: "engine",
     lines: [
-      "Have Eladamri + Yavimaya + enough creatures for lethal damage on battlefield.",
-      "Yavimaya: every land is a Forest for all players — opponents always control a Forest.",
-      "Eladamri: all your creatures have forestwalk (unblockable vs Forest-controlling players) AND protection from targeted spells/abilities.",
-      "Your army is unblockable and untargetable. Attack for lethal.",
+      "Eladamri on battlefield — you may look at the top card of your library at any time.",
+      "You may cast creature spells from the top of your library (at instant speed with Yeva's flash).",
+      "Activated ability: {G}, {T}, tap two untapped creatures you control — reveal the top card of your library or a card from your hand. If it's a creature card, put it onto the battlefield. Otherwise, put it on the bottom of your library.",
+      "With infinite mana: activate repeatedly, tapping creatures already on board to pay the creature cost. Each activation puts a creature directly into play.",
+      "Pairs with Seedborn Muse: untap all creatures between opponent turns for free repeated activations.",
+      "Best targets: Ashaya (to go infinite), Temur Sabertooth, Kogla, or any missing combo piece.",
     ]
   },
 
@@ -845,43 +825,40 @@ const COMBOS = [
     name: "Hope Tender + Kogla + Big Land (≥4 mana)",
     onBattlefield: ["Hope Tender", "Kogla, the Titan Ape"],
     mustPreExist: ["Hope Tender", "Kogla, the Titan Ape"],
-    description: "Infinite mana. Tap Hope Tender for {G}, exert it to untap a big land (Gaea's Cradle or Nykthos producing ≥4). Pay {2} to activate Kogla, returning Hope Tender (a Human) to hand — fully resetting the exert. Recast Hope Tender for {1}{G}. Each loop nets mana equal to land output minus 3.",
+    description: "Infinite mana. Hope Tender has two {T} abilities: tap for {G}, or exert (tap) to untap a land. Use Kogla's {2} activated ability to return Hope Tender (Human) to hand, resetting the exert. Loop: exert Hope Tender to untap big land, tap land for N, pay {2} Kogla + recast {1}{G}. Net: (land output − 3) per loop. Need N ≥ 4.",
     requires: ["Hope Tender", "Kogla, the Titan Ape"],
     needsAlso: ["Gaea's Cradle", "Nykthos, Shrine to Nyx", "Itlimoc, Cradle of the Sun"],
     priority: 10,
     type: "infinite-mana",
     lines: [
       "Hope Tender and Kogla, the Titan Ape on battlefield. Big land (Cradle/Nykthos/Itlimoc) producing ≥4 mana.",
-      "Tap Hope Tender for {G}.",
-      "Exert Hope Tender: untap the big land.",
+      "Tap Hope Tender using the exert ability ({T}, exert): untap the big land.",
       "Tap big land for {N} mana (≥4).",
-      "Pay {2}: activate Kogla, return Hope Tender (a Human) to hand — exert is fully reset.",
-      "Recast Hope Tender for {1}{G}. Net: (land output − 3) mana per loop.",
-      "Repeat for infinite green mana.",
+      "Pay {2}: Kogla's activated ability returns Hope Tender (a Human) to hand — exert is fully reset.",
+      "Recast Hope Tender for {1}{G}. Net: (land output − 3) mana per loop. Repeat for infinite green mana.",
     ]
   },
 
   // ── Hope Tender + Wirewood Lodge + Land (≥3 mana) ─────────────────────
   {
     id: "hope_tender_lodge",
-    name: "Hope Tender + Wirewood Lodge + Land (≥3 mana)",
+    name: "Hope Tender + Wirewood Lodge + Land (≥2 mana)",
     onBattlefield: ["Hope Tender", "Wirewood Lodge"],
     mustPreExist: ["Hope Tender", "Wirewood Lodge"],
     description: "Infinite mana. Tap Hope Tender for {G} and exert it to untap a land producing ≥3. Spend {G} activating Wirewood Lodge to untap Hope Tender (an Elf) — this bypasses the exert restriction since Lodge forcibly untaps it. Net: (land output − 2) mana per loop. Infinite when land produces ≥3.",
     requires: ["Hope Tender", "Wirewood Lodge"],
     needsAlso: ["Gaea's Cradle", "Nykthos, Shrine to Nyx", "Itlimoc, Cradle of the Sun"],
     needsAuraLand: true,
-    needsAuraLand3: true,
     priority: 10,
     type: "infinite-mana",
     lines: [
-      "Hope Tender + Wirewood Lodge + a land producing ≥3 mana on battlefield.",
+      "Hope Tender + Wirewood Lodge + a land producing ≥2 mana on battlefield.",
       "Eligible lands: Gaea's Cradle, Nykthos, Itlimoc, or a Forest enchanted with Utopia Sprawl/Wild Growth.",
-      "Tap Hope Tender for {G}, then exert: untap the big land.",
-      "Tap big land for ≥3 mana.",
+      "Tap Hope Tender using the exert ability ({T}, exert): untap the big land.",
+      "Tap big land for ≥2 mana.",
       "Spend {G}: activate Wirewood Lodge, untapping Hope Tender (an Elf).",
-      "Lodge's untap bypasses the exert — Hope Tender can tap and exert again immediately.",
-      "Net: (land output − 2) mana per loop. Repeat for infinite mana.",
+      "Lodge's forced untap bypasses the exert restriction — Hope Tender can activate exert again immediately.",
+      "Net: (land output − 1) mana per loop. Repeat for infinite mana.",
     ]
   },
 
@@ -903,29 +880,6 @@ const COMBOS = [
       "Tap enchanted Forest again for {G} × (elf count) — second activation.",
       "Spend {G}: activate Wirewood Lodge, untapping Arbor Elf.",
       "Net: (elf count − 1) mana per full loop. With 3+ elves nets 2+. Repeat for infinite mana.",
-    ]
-  },
-
-  // ── Big Elf Dork + Wirewood Lodge (≥2 elves / creatures) ──────────────
-  // Covers: Priest of Titania, Elvish Archdruid, Circle of Dreams Druid
-  // All tap for N (elves or creatures), Lodge untaps for {G}. Net: N−1 per loop.
-  {
-    id: "big_dork_lodge",
-    name: "Big Elf Dork + Wirewood Lodge (≥2 elves/creatures)",
-    onBattlefield: ["Wirewood Lodge"],
-    mustPreExist: ["Wirewood Lodge"],
-    description: "Infinite mana. Any big elf dork (Priest of Titania, Elvish Archdruid, Fanatic of Rhonas, Circle of Dreams Druid) taps for N ≥ 2 mana. Wirewood Lodge pays {G} to untap the dork (it's an elf). Net N−1 per loop. Infinite whenever N ≥ 2.",
-    requires: ["Wirewood Lodge"],
-    needsBigElfDorkOnBoard: 2,
-    priority: 9,
-    type: "infinite-mana",
-    lines: [
-      "A big elf dork on battlefield: Priest of Titania, Elvish Archdruid, Fanatic of Rhonas (fixed 4), or Circle of Dreams Druid — producing ≥2 mana.",
-      "Wirewood Lodge on battlefield.",
-      "Tap the big dork for N mana (N ≥ 2).",
-      "Spend {G}: activate Wirewood Lodge to untap the big dork (it's an elf).",
-      "Net: N − 1 mana per loop. Repeat for infinite green mana.",
-      "Circle of Dreams Druid counts all creatures — counts itself, so minimum output is 1 (usually much more).",
     ]
   },
 
@@ -1003,16 +957,16 @@ const COMBOS = [
     id: "disciple_loop",
     name: "Disciple of Freyalise Loop (Infinite Mana -- Board Wipe + Draw)",
     onBattlefield: ["Disciple of Freyalise"],
-    description: "With infinite mana and a bouncer: cast Disciple of Freyalise, each opponent sacrifices a creature, you draw cards equal to creatures you control. Bounce with Sabertooth/Kogla, recast. Each loop clears opponents' boards AND draws cards.",
+    description: "With infinite mana and Temur Sabertooth: cast Disciple of Freyalise, each opponent sacrifices a creature, you draw cards equal to creatures you control. Bounce with Sabertooth and recast. Each loop clears opponents' boards AND draws cards. Note: Disciple is an Elf, not a Human — Kogla cannot bounce it.",
     requires: ["Disciple of Freyalise"],
     needsInfiniteMana: true,
     needsAlsoBouncer: true,
     priority: 9,
     type: "win-draw",
     lines: [
-      "SETUP: Infinite mana active. Disciple of Freyalise + Temur Sabertooth or Kogla on battlefield.",
+      "SETUP: Infinite mana active. Disciple of Freyalise + Temur Sabertooth on battlefield (Disciple is an Elf, not a Human — Kogla cannot bounce it).",
       "Disciple ETB: each opponent sacrifices a creature, then you draw cards equal to creatures you control.",
-      "Pay {1}{G} (Sabertooth) or {2} (Kogla): bounce Disciple to hand.",
+      "Pay {1}{G}: Temur Sabertooth bounces Disciple to hand.",
       "Recast Disciple ({4}{G}): ETB triggers again -- opponents sacrifice again, you draw again.",
       "Each loop clears one creature from each opponent's board AND draws you cards.",
       "After opponents have no creatures: draw your library via repeated Disciple ETBs, then win via standard pile.",
@@ -1041,24 +995,22 @@ const COMBOS = [
     ]
   },
 
-  // ── Elvish Archdruid pump + Yavimaya + Eladamri combat win ────────────────
+  // ── Elvish Archdruid pump combat win (infinite mana) ────────────────────────
   {
     id: "archdruid_pump_win",
-    name: "Elvish Archdruid Pump + Yavimaya + Eladamri (Infinite Combat Win)",
-    onBattlefield: ["Elvish Archdruid", "Yavimaya, Cradle of Growth", "Eladamri, Korvecdal"],
-    description: "With infinite mana: Elvish Archdruid's activated ability gives all elves +N/+N. Activate infinitely to give your elves arbitrarily large stats. Yavimaya makes all lands Forests for all players. Eladamri gives all your creatures forestwalk (unblockable vs Forest-controlling players) and shroud from opponents.",
-    requires: ["Elvish Archdruid", "Yavimaya, Cradle of Growth", "Eladamri, Korvecdal"],
+    name: "Elvish Archdruid Pump + Infinite Mana (Infinite Combat Win)",
+    onBattlefield: ["Elvish Archdruid"],
+    description: "With infinite mana and Temur Sabertooth: Elvish Archdruid's activated ability gives all elves +N/+N. Activate infinitely via bouncing Archdruid with Sabertooth to give your elves arbitrarily large stats. Attack for lethal.",
+    requires: ["Elvish Archdruid"],
     needsInfiniteMana: true,
     priority: 10,
     type: "win-combat",
     lines: [
-      "SETUP: Infinite mana active. Elvish Archdruid + Yavimaya + Eladamri on battlefield.",
+      "SETUP: Infinite mana active. Elvish Archdruid on battlefield.",
       "Tap Elvish Archdruid: all elves you control get +N/+N until end of turn (N = elves on board).",
-      "With infinite mana, activate Archdruid infinite times -- each activation layers +N/+N on top.",
-      "Yavimaya: every land for every player is a Forest. All opponents always control a Forest.",
-      "Eladamri: all your creatures have forestwalk (unblockable vs Forest controllers) AND shroud from opponents.",
-      "Your elf army is now infinitely large, completely unblockable, and untargetable.",
-      "Attack for lethal across all opponents simultaneously.",
+      "With Temur Sabertooth: pay {1}{G} to bounce Archdruid, recast, activate again — stack unlimited pump.",
+      "Your elf army is now arbitrarily large. Attack for lethal across all opponents.",
+      "TIP: Add Yavimaya if opponents have blockers with protection from green (makes all lands Forests for forestwalk).",
     ]
   },
 
@@ -1670,9 +1622,9 @@ const SECRET_CARDS = {
 // ============================================================
 const CATEGORIES = {
   "1-Drop Dorks": ["Llanowar Elves","Elvish Mystic","Fyndhorn Elves","Boreal Druid","Birds of Paradise","Arbor Elf","Quirion Ranger","Wirewood Symbiote","Elvish Reclaimer","Elvish Spirit Guide","Magus of the Candelabra","Allosaurus Shepherd"],
-  "2-3 Drop Creatures": ["Scryb Ranger","Priest of Titania","Earthcraft","Elvish Archdruid","Circle of Dreams Druid","Duskwatch Recruiter","Heartwood Storyteller","Hyrax Tower Scout","Eternal Witness","Fauna Shaman","Formidable Speaker","Destiny Spinner","Collector Ouphe","Glademuse","Delighted Halfling","Badgermole Cub","Chomping Changeling","Yisan, the Wanderer Bard","Elvish Harbinger","Fierce Empath","Tireless Provisioner","Nature's Rhythm","Endurance","Hope Tender"],
-  "4-5 Drop Creatures": ["Ashaya, Soul of the Wild","Temur Sabertooth","Karametra's Acolyte","Fanatic of Rhonas","Argothian Elder","Seedborn Muse","Eladamri, Korvecdal","Growing Rites of Itlimoc","Beast Whisperer","Yeva, Nature's Herald"],
-  "6+ Drop Creatures": ["Kogla, the Titan Ape","Disciple of Freyalise","Woodland Bellower","Regal Force","Woodcaller Automaton","Sowing Mycospawn"],
+  "2-3 Drop Creatures": ["Scryb Ranger","Priest of Titania","Fanatic of Rhonas","Earthcraft","Elvish Archdruid","Circle of Dreams Druid","Eladamri, Korvecdal","Duskwatch Recruiter","Heartwood Storyteller","Hyrax Tower Scout","Eternal Witness","Fauna Shaman","Formidable Speaker","Destiny Spinner","Collector Ouphe","Glademuse","Delighted Halfling","Badgermole Cub","Chomping Changeling","Yisan, the Wanderer Bard","Elvish Harbinger","Fierce Empath","Tireless Provisioner","Endurance","Hope Tender"],
+  "4-5 Drop Creatures": ["Ashaya, Soul of the Wild","Temur Sabertooth","Karametra's Acolyte","Argothian Elder","Seedborn Muse","Growing Rites of Itlimoc","Beast Whisperer","Yeva, Nature's Herald","Disciple of Freyalise","Sowing Mycospawn"],
+  "6+ Drop Creatures": ["Kogla, the Titan Ape","Woodland Bellower","Regal Force","Woodcaller Automaton"],
   "Rocks & Artifacts": ["Sol Ring","Chrome Mox","Mox Diamond","Lotus Petal"],
   "Enchantments": ["Utopia Sprawl","Wild Growth","Survival of the Fittest","Elvish Guidance"],
   "Instants & Sorceries": ["Worldly Tutor","Chord of Calling","Summoner's Pact","Shared Summons","Green Sun's Zenith","Natural Order","Eldritch Evolution","Crop Rotation","Sylvan Scrying","Archdruid's Charm","Beast Within","Force of Vigor","Infectious Bite","Legolas's Quick Reflexes"],
@@ -1696,7 +1648,7 @@ function calculateCardManaForPool(card, battlefield) {
       return creatures;
     } else if (card === "Nykthos, Shrine to Nyx") {
       const devotion = battlefield.reduce((s, c) => s + (getCard(c)?.devotion ?? 0), 0);
-      return Math.max(0, devotion - 2);
+      return devotion === 0 ? 0 : Math.max(1, devotion - 2); // always at least 1 if any devotion, because {T}:Add{G} is the fallback
     } else if (card === "Ancient Tomb") {
       return 2;
     } else if (data.tags?.includes("fetch")) {
@@ -1726,7 +1678,7 @@ function calculateCardManaForPool(card, battlefield) {
   return 0;
 }
 
-function calculateBattlefieldMana(battlefield) {
+function calculateBattlefieldMana(battlefield, sickSet = null) {
   const board = new Set(battlefield);
   const creatures  = battlefield.filter(c => getCard(c)?.type === "creature");
   const elves      = creatures.filter(c => getCard(c)?.tags?.includes("elf")).length;
@@ -1743,11 +1695,13 @@ function calculateBattlefieldMana(battlefield) {
   for (const card of battlefield) {
     const data = CARDS[card] ?? EXTRA_CARDS.get(card);
     if (!data) continue;
+    // Summoning sickness: skip dorks/big-dorks that entered this turn
+    if (sickSet?.has(card) && (data.tags?.includes("dork") || data.tags?.includes("big-dork"))) continue;
     if (data.type === "land") {
       if (card === "Gaea's Cradle" || card === "Itlimoc, Cradle of the Sun") {
         total += creatureCount;
       } else if (card === "Nykthos, Shrine to Nyx") {
-        total += Math.max(0, devotion - 2); // spend {2} to activate
+        total += devotion === 0 ? 0 : Math.max(1, devotion - 2); // always at least 1 if any devotion
       } else if (card === "Ancient Tomb") {
         total += 2; // taps for {C}{C}
       } else if (data.tags?.includes("fetch")) {
@@ -1826,6 +1780,9 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   //   1. Eternal Witness in hand → ETB retrieves any card from grave
   //   2. Fauna Shaman on board + Eternal Witness in grave → discard creature → find Witness → retrieve target
   //      (Fauna Shaman must be able to activate: needs a creature to discard + {G})
+  //   3. Noxious Revival in hand (free instant) → puts any graveyard card on top of library
+  //      (only counts as "accessible" for cards we can draw+cast same turn, or if library is empty)
+  //   4. Skullwinder in hand/board — ETB retrieves a card from grave
   const faunaCanFetchWitness = () =>
     board.has("Fauna Shaman") &&
     inGrave.has("Eternal Witness") &&
@@ -1836,9 +1793,28 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     if (inHand.has("Eternal Witness") && !board.has("Eternal Witness")) return true;
     // Fauna Shaman on board → discard → find Witness → Witness retrieves cardName
     if (faunaCanFetchWitness()) return true;
+    // Skullwinder in hand — ETB retrieves from graveyard
+    if (inHand.has("Skullwinder") && mana >= 3) return true;
     return false;
   };
+  // Noxious Revival puts a card on top — only accessible if we have draw in hand or infinite mana
+  const noxiousRetrievable = (cardName) => {
+    if (!inGrave.has(cardName)) return false;
+    if (!inHand.has("Noxious Revival")) return false;
+    // Can only "access" it this turn if we can immediately draw (e.g. Survival, Regal, draw spell)
+    // or if library is empty (would draw it next)
+    return false; // conservative — treat as "recoverable next turn" not "accessible now"
+  };
   const accessible = (cardName) => inHand.has(cardName) || witnessRetrievable(cardName);
+
+  // graveRecoverable(cardName) — card is in graveyard with a recovery path available
+  // (broader than accessible — includes Noxious Revival → top of library next draw)
+  const graveRecoverable = (cardName) => {
+    if (!inGrave.has(cardName)) return false;
+    if (witnessRetrievable(cardName)) return true;
+    if (inHand.has("Noxious Revival")) return true; // puts on top → draw next turn
+    return false;
+  };
 
   const mana = parseInt(manaAvailable) || 0;
   const elvesOnBoard    = battlefield.filter(c => getCard(c)?.tags?.includes("elf")).length;
@@ -1937,13 +1913,13 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   //   Pass 2: pieces in hand castable on our turn or with Yeva flash.
   //           mustPreExist cards (summoning-sick tappers) must be on the board even in pass 2
   //           UNLESS a haste enabler (Ashaya + Destiny Spinner on board) is clearly present.
-  let _inf = false, _infName = null;
+  let _inf = false, _infName = null, _trueInf = false;
   for (const combo of COMBOS) {
     if (combo.type !== "infinite-mana") continue;
     const allOnBoard = combo.requires.every(r => board.has(r));
     if (!allOnBoard) continue;
     const extras = comboExtrasSatisfied(combo, false);
-    if (extras.ok) { _inf = true; _infName = combo.name; break; }
+    if (extras.ok) { _inf = true; _trueInf = true; _infName = combo.name; break; }
   }
   if (!_inf) {
     const _castable = isMyTurn || yevaFlash;
@@ -1970,6 +1946,8 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     }
   }
   const infiniteManaActive = _inf;
+  // trueInfiniteManaActive: ALL combo pieces are on the battlefield (loop is running, not bootstrap).
+  const trueInfiniteManaActive = _trueInf;
   // Yeva is the commander — always castable from command zone for {2}{G}{G} (or more with tax).
   // yevaAvailable = flash already active, OR infinite mana (tax irrelevant), OR ≥4 mana to cast her.
   const yevaAvailable = yevaFlash || infiniteManaActive || mana >= 4;
@@ -2014,6 +1992,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     // Only combos bouncing a Human (Hyrax Scout, Eternal Witness, Hope Tender) can use Kogla.
     if (combo.needsAlsoBouncer) {
       const nonHumanBounce = combo.id === "disciple_freyalise_loop"
+        || combo.id === "disciple_loop"
         || combo.id === "regal_force_draw"
         || combo.id === "sabertooth_woodcaller"
         || combo.id === "woodcaller_ashaya_loop";
@@ -2097,24 +2076,6 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       if (elfCount < combo.needsMinElves) {
         return { ok: false, missing: `at least ${combo.needsMinElves} elves on battlefield (have ${elfCount})` };
       }
-    }
-
-    // needsBigElfDorkOnBoard: like needsBigDork but restricted to battlefield only
-    // and requires the dork to be an elf (so Wirewood Lodge can untap it).
-    // Uses the same extraElves logic as findBigDork for consistency.
-    if (combo.needsBigElfDorkOnBoard) {
-      const threshold = combo.needsBigElfDorkOnBoard;
-      let _canCast2 = false;
-      try { _canCast2 = canCastNow; } catch(e) { _canCast2 = false; }
-      const elvesInHand2 = _canCast2
-        ? hand.filter(c => getCard(c)?.tags?.includes("elf")).length
-        : 0;
-      const dork = battlefield.find(c => {
-        if (!getCard(c)?.tags?.includes("elf")) return false;
-        if (!getCard(c)?.tags?.includes("dork") && !getCard(c)?.tags?.includes("big-dork")) return false;
-        return estimateDorkOutput(c, elvesInHand2) >= threshold;
-      });
-      if (!dork) return { ok: false, missing: `a big elf dork on battlefield producing ≥${threshold} mana (Priest of Titania, Elvish Archdruid, or Circle of Dreams Druid with ${threshold}+ elves/creatures)` };
     }
 
     // needsAnyOf: combo requires at least one of a list of named cards (OR semantics).
@@ -2303,6 +2264,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   }
 
   // ---- ARBOR ELF + AURA SYNERGY ----
+  // Case A: Arbor Elf on board, aura in hand — cast the aura to unlock double-mana
   if (board.has("Arbor Elf") && (inHand.has("Utopia Sprawl") || inHand.has("Wild Growth") || inHand.has("Elvish Guidance")) && (mana >= 1 || infiniteManaActive)) {
     const aura = inHand.has("Elvish Guidance") ? "Elvish Guidance"
       : inHand.has("Utopia Sprawl") ? "Utopia Sprawl" : "Wild Growth";
@@ -2332,6 +2294,31 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       color: "#52be80",
     });
   }
+  // Case B: Aura already on board, Arbor Elf in hand — cast Arbor Elf to unlock double-mana NOW
+  if (inHand.has("Arbor Elf") && (board.has("Utopia Sprawl") || board.has("Wild Growth") || board.has("Elvish Guidance")) && (mana >= 1 || infiniteManaActive)) {
+    const aura = board.has("Elvish Guidance") ? "Elvish Guidance"
+      : board.has("Utopia Sprawl") ? "Utopia Sprawl" : "Wild Growth";
+    const guidanceOutput = aura === "Elvish Guidance" ? elvesOnBoard + 1 : 2; // +1 for Arbor Elf itself
+    const totalMana = aura === "Elvish Guidance" ? guidanceOutput * 2 : 3;
+    results.push({
+      priority: 9,
+      category: "🌱 RAMP",
+      headline: aura === "Elvish Guidance"
+        ? `Cast Arbor Elf → unlocks ${totalMana} mana from Elvish Guidance Forest (${guidanceOutput} × 2)`
+        : `Cast Arbor Elf → unlocks 3 mana from ${aura}-enchanted Forest`,
+      detail: aura === "Elvish Guidance"
+        ? `${aura} is already enchanting a Forest. Cast Arbor Elf (CMC 1) and it can immediately untap that Forest for a second activation — ${guidanceOutput * 2} mana total.`
+        : `${aura} is already on a Forest producing {G}{G}. Cast Arbor Elf (CMC 1) and untap that Forest for a second tap — 3 mana total from one Forest.`,
+      steps: [
+        `Cast Arbor Elf (${mana >= 1 ? "you have the mana" : "free"}).`,
+        `Tap the ${aura}-enchanted Forest for ${aura === "Elvish Guidance" ? `${guidanceOutput} {G} (${guidanceOutput} elves)` : "{G}{G}"}.`,
+        "Activate Arbor Elf: untap that Forest.",
+        `Tap the Forest again for another ${aura === "Elvish Guidance" ? `${guidanceOutput} {G}` : "{G}{G}"} — ${totalMana} mana total.`,
+        ...(board.has("Wirewood Lodge") ? [`Wirewood Lodge can untap Arbor Elf (it's an elf) for {G} — repeat for ${totalMana - 1} net mana per loop.`] : []),
+      ],
+      color: "#52be80",
+    });
+  }
 
   // ---- HOPE TENDER + BIG LAND ----
   if (inHand.has("Hope Tender") && (mana >= 2 || infiniteManaActive)) {
@@ -2350,17 +2337,17 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
           ? `Cast Hope Tender — Kogla resets exert for repeatable ${target} untap`
           : `Cast Hope Tender — exert to untap ${target}`,
         detail: hasKogla
-          ? `Hope Tender is a Human — Kogla returns it to hand on attack, completely resetting the exert. Cast, tap, exert to untap ${target}, then Kogla bounces it back. Repeatable every turn, or freely with infinite mana.`
-          : `Hope Tender taps for {G} and can exert to untap any land. With ${target} in play, untapping it effectively doubles your mana output.`,
+          ? `Hope Tender is a Human — Kogla's {2} activated ability returns it to hand, resetting the exert. Cast, use exert ability to untap ${target}, tap ${target} for mana, Kogla bounces it back. Repeatable with infinite mana.`
+          : `Hope Tender can exert ({T}: untap target land) or tap for {G} — pick one per tap. With ${target} in play, using the exert ability to untap it each loop generates big mana.`,
         steps: [
           `Cast Hope Tender ({1}{G}).`,
-          `Tap Hope Tender for {G}, then exert: untap ${target}.`,
+          `Tap Hope Tender using the exert ability ({T}, exert): untap ${target}.`,
           `Tap ${target} for big mana.`,
           ...(hasKogla ? [
-            "Kogla attacks: return Hope Tender (Human) to hand — exert fully resets.",
+            "Pay {2}: Kogla returns Hope Tender (Human) to hand — exert fully resets.",
             "Recast and repeat next turn (or immediately with infinite mana).",
           ] : hasUntapper ? [
-            board.has("Wirewood Lodge") ? "Wirewood Lodge ({G}): untap Hope Tender to reset exert." :
+            board.has("Wirewood Lodge") ? "Wirewood Lodge ({G}): untap Hope Tender — Lodge's forced untap bypasses the exert restriction." :
             "Quirion Ranger: return itself to hand to untap Hope Tender — resets exert.",
           ] : ["Add Kogla (best), Wirewood Lodge, or Quirion Ranger to reset the exert each turn."]),
         ],
@@ -2404,6 +2391,69 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       });
     }
   }
+  // ---- GRAVEYARD RECOVERY — KEY COMBO PIECES ----
+  // If critical combo pieces (Ashaya, Argothian Elder, Quirion/Scryb Ranger, big dorks, etc.)
+  // are in the graveyard with a recovery path, surface this as high-priority advice.
+  {
+    const KEY_COMBO_PIECES = [
+      "Ashaya, Soul of the Wild", "Argothian Elder", "Quirion Ranger", "Scryb Ranger",
+      "Temur Sabertooth", "Kogla, the Titan Ape", "Earthcraft", "Wirewood Symbiote",
+      "Duskwatch Recruiter", "Formidable Speaker", "Priest of Titania",
+      "Circle of Dreams Druid", "Selvala, Heart of the Wilds", "Elvish Archdruid",
+      "Marwyn, the Nurturer", "Karametra's Acolyte", "Magus of the Candelabra",
+      "Hope Tender", "Hyrax Tower Scout", "Natural Order",
+    ];
+    const graveCombopieces = KEY_COMBO_PIECES.filter(c => inGrave.has(c) && !board.has(c) && !inHand.has(c));
+
+    if (graveCombopieces.length > 0) {
+      // Determine the best recovery path
+      const hasWitness       = inHand.has("Eternal Witness") && mana >= 2;
+      const hasFaunaWitness  = faunaCanFetchWitness();
+      const hasSkullwinder   = inHand.has("Skullwinder") && mana >= 3;
+      const hasNoxRevival    = inHand.has("Noxious Revival");
+      const hasRecoveryPath  = hasWitness || hasFaunaWitness || hasSkullwinder || hasNoxRevival;
+
+      if (hasRecoveryPath) {
+        const target = graveCombopieces[0]; // highest priority missing piece
+        const recoveryMethod = hasWitness
+          ? `Cast Eternal Witness ({1}{G}{G}): ETB returns ${target} to hand.`
+          : hasFaunaWitness
+            ? `Fauna Shaman: discard a creature → find Eternal Witness → EWit ETB returns ${target}.`
+            : hasSkullwinder
+              ? `Cast Skullwinder ({2}{G}): ETB returns ${target} from graveyard to hand.`
+              : `Cast Noxious Revival (free, pay 2 life): put ${target} on top of library. Draw it next turn or with a draw effect.`;
+        const isThisTurn = hasWitness || hasFaunaWitness || hasSkullwinder;
+        results.push({
+          priority: 12,
+          category: `♻️ RECOVER ${isThisTurn ? "NOW" : "NEXT TURN"}`,
+          headline: `${target} is in graveyard — recover it ${isThisTurn ? "this turn" : "via Noxious Revival"}`,
+          detail: `${target} is a key combo piece sitting in your graveyard. ${isThisTurn
+            ? "You have a creature recursion path available this turn."
+            : "Noxious Revival (free instant, pay 2 life) puts it on top of your library — draw it next turn."}${graveCombopieces.length > 1 ? ` Other graveyard pieces: ${graveCombopieces.slice(1, 3).join(", ")}.` : ""}`,
+          steps: [
+            recoveryMethod,
+            ...(graveCombopieces.length > 1 && isThisTurn ? [`Other graveyard pieces also recoverable: ${graveCombopieces.slice(1, 3).join(", ")}.`] : []),
+            `Once recovered, proceed with standard ${target.includes("Ashaya") || target.includes("Elder") ? "infinite mana" : target.includes("Duskwatch") ? "win" : "combo"} line.`,
+          ],
+          color: "#27ae60",
+        });
+      } else if (graveCombopieces.length >= 2) {
+        // Multiple combo pieces in grave but no recovery — note it as suppressed info
+        results.push({
+          priority: 3,
+          category: "💀 GRAVEYARD",
+          headline: `${graveCombopieces.length} combo pieces in graveyard — no recovery path`,
+          detail: `${graveCombopieces.slice(0, 3).join(", ")} are in your graveyard. No Eternal Witness, Skullwinder, or Noxious Revival available to recover them. Consider fetching Eternal Witness as your next tutor target.`,
+          steps: [
+            `Pieces in graveyard: ${graveCombopieces.join(", ")}.`,
+            "Fetch Eternal Witness (CMC 3, any tutor) to recover the most critical piece.",
+          ],
+          color: "#7f8c8d",
+        });
+      }
+    }
+  }
+
   // ---- NATURAL ORDER ----
   if (inHand.has("Natural Order")) {
     // ---- Check if Natural Order is an immediate WIN LINE ----
@@ -2807,7 +2857,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { name: "Ashaya, Soul of the Wild", xCost: 5, reason: "combo engine — all creatures become Forests" },
       { name: "Seedborn Muse",           xCost: 4, reason: "untap all permanents on each opponent's untap — enables free activations every turn" },
       { name: "Eternal Witness",         xCost: 3, reason: "retrieve key piece from graveyard" },
-    ].filter(t => !board.has(t.name) && (mana >= t.xCost + 1 || infiniteManaActive));
+    ].filter(t => !board.has(t.name) && !inHand.has(t.name) && (mana >= t.xCost + 1 || infiniteManaActive));
     if (gsTargets.length > 0) {
       const best = gsTargets[0];
       results.push({
@@ -2848,7 +2898,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { name: "Hyrax Tower Scout",        xCost: 3, reason: "untaps a land on ETB — combo piece with Temur Sabertooth" },
       { name: "Seedborn Muse",            xCost: 5, reason: "untaps all permanents each opponent's turn — game-changing engine" },
       { name: "Kogla, the Titan Ape",     xCost: 6, reason: "bouncer + removal, returns humans on attack" },
-    ].filter(t => !board.has(t.name) && effectiveMana >= t.xCost + 1);
+    ].filter(t => !board.has(t.name) && !inHand.has(t.name) && effectiveMana >= t.xCost + 1);
 
     if (chordTargets.length > 0) {
       const best = chordTargets[0];
@@ -2885,18 +2935,19 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { name: "Destiny Spinner",       xCost: 2, reason: "haste + uncounterable protection" },
       { name: "Quirion Ranger",        xCost: 1, reason: "infinite mana loop with Ashaya" },
       { name: "Elvish Reclaimer",      xCost: 1, reason: "land tutor" },
-    ].filter(t => !board.has(t.name) && (mana >= t.xCost + 1 || infiniteManaActive));
+    ].filter(t => !board.has(t.name) && !inHand.has(t.name) && (mana >= t.xCost + 1 || infiniteManaActive));
     if (nrTargets.length > 0) {
       const best = nrTargets[0];
       results.push({
         priority: 7,
         category: "🎯 NATURE'S RHYTHM",
         headline: `Nature's Rhythm (X=${best.xCost}) → ${best.name}`,
-        detail: "Nature's Rhythm functions as a second Green Sun's Zenith with a key upside: after resolving, you may cast it again from exile once. Use it to find a piece now and recycle it later.",
+        detail: "Nature's Rhythm ({X}{G}{G}) puts a creature with MV ≤ X directly onto the battlefield. After casting normally it goes to your graveyard — then you can cast it again via Harmonize ({X}{G}{G}{G}{G}, tap creatures to reduce the generic cost by their power), after which it's exiled for good.",
         steps: [
-          `Cast Nature's Rhythm with X=${best.xCost}: find ${best.name} → put onto battlefield.`,
+          `Cast Nature's Rhythm with X=${best.xCost} (total cost: ${best.xCost + 2} mana): find ${best.name} → put onto battlefield.`,
           `${best.reason.charAt(0).toUpperCase() + best.reason.slice(1)}.`,
-          "After use: Nature's Rhythm goes to exile and can be cast again once — a built-in second activation.",
+          "Nature's Rhythm goes to graveyard after resolving — save it for a second use via Harmonize.",
+          "Harmonize: recast from graveyard for {X}{G}{G}{G}{G}. Tap your biggest creatures to reduce the generic cost by their power. Then the spell is exiled.",
           ...(nrTargets.length > 1 ? [`Other options: ${nrTargets.slice(1,2).map(t => `X=${t.xCost} → ${t.name}`).join(", ")}.`] : []),
         ],
         color: "#5dade2",
@@ -2904,39 +2955,38 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     }
   }
 
-  // ---- NATURE'S RHYTHM ON BATTLEFIELD ----
-  // Each upkeep: search library for a creature with CMC ≤ lands you control.
-  // Persistent tutor engine — advise what to find next upkeep based on current board.
-  if (board.has("Nature's Rhythm")) {
-    const landsOnBoard = battlefield.filter(c => getCard(c)?.type === "land").length;
-    const nrBoardTargets = [
+  // ---- NATURE'S RHYTHM IN GRAVEYARD ----
+  // Nature's Rhythm is a sorcery — it never sits on the battlefield.
+  // After the first cast it goes to graveyard. Advise on Harmonize reuse if it's there.
+  if (inGrave.has("Nature's Rhythm")) {
+    const bigCreatures = battlefield.filter(c => getCard(c)?.type === "creature").map(c => ({ name: c, power: getCard(c)?.tapsFor || 1 }));
+    const totalPowerReduction = bigCreatures.reduce((sum, c) => sum + (typeof c.power === "number" ? c.power : 1), 0);
+    const grTargets = [
       { name: "Ashaya, Soul of the Wild",  xCost: 5, reason: "unlocks all infinite mana combos" },
-      { name: "Duskwatch Recruiter",        xCost: 2, reason: "win condition with infinite mana" },
-      { name: "Priest of Titania",          xCost: 2, reason: "big mana dork" },
-      { name: "Elvish Archdruid",           xCost: 3, reason: "big mana dork + elf pump" },
-      { name: "Quirion Ranger",             xCost: 1, reason: "infinite mana loop piece" },
-      { name: "Argothian Elder",            xCost: 4, reason: "untap engine, goes infinite with Lodge" },
       { name: "Temur Sabertooth",           xCost: 4, reason: "bounce engine for ETB loops" },
-      { name: "Eternal Witness",            xCost: 3, reason: "recursion for any missing piece" },
+      { name: "Argothian Elder",            xCost: 4, reason: "infinite mana with Wirewood Lodge" },
+      { name: "Elvish Archdruid",           xCost: 3, reason: "big mana dork + elf pump" },
+      { name: "Duskwatch Recruiter",        xCost: 2, reason: "win condition with infinite mana" },
       { name: "Hope Tender",                xCost: 2, reason: "untap big land, Kogla resets exert" },
-      { name: "Destiny Spinner",            xCost: 2, reason: "haste + uncounterable protection" },
-      { name: "Allosaurus Shepherd",        xCost: 1, reason: "makes elves uncounterable" },
-    ].filter(t => !board.has(t.name) && t.xCost <= landsOnBoard);
+      { name: "Quirion Ranger",             xCost: 1, reason: "infinite mana loop piece" },
+    ].filter(t => !board.has(t.name) && !inHand.has(t.name));
 
-    if (nrBoardTargets.length > 0) {
-      const best = nrBoardTargets[0];
+    if (grTargets.length > 0) {
+      const best = grTargets[0];
+      const harmonizeCost = best.xCost + 4;
+      const reducedCost = Math.max(0, harmonizeCost - totalPowerReduction);
       results.push({
         priority: 6,
-        category: "🔄 NATURE'S RHYTHM ENGINE",
-        headline: `Nature's Rhythm: fetch ${best.name} next upkeep (CMC ${best.xCost} ≤ ${landsOnBoard} lands)`,
-        detail: `Nature's Rhythm tutors a creature with CMC ≤ your land count (${landsOnBoard}) at each upkeep for free. Plan your next fetch now.`,
+        category: "🔄 NATURE'S RHYTHM HARMONIZE",
+        headline: `Harmonize Nature's Rhythm from graveyard: find ${best.name}`,
+        detail: `Nature's Rhythm is in your graveyard and can be recast once via Harmonize ({X}{G}{G}{G}{G}). Tap your creatures to reduce the generic cost by their power. After resolving it's exiled.`,
         steps: [
-          `Next upkeep: search for ${best.name} (CMC ${best.xCost}) — ${best.reason}.`,
-          ...(nrBoardTargets.length > 1 ? [
-            `Alternative targets: ${nrBoardTargets.slice(1, 3).map(t => `${t.name} (${t.xCost})`).join(", ")}.`,
-          ] : []),
-          `Current land count: ${landsOnBoard}. Max CMC you can find: ${landsOnBoard}.`,
-          landsOnBoard >= 5 ? "With 5+ lands you can tutor Ashaya or Temur Sabertooth directly." : `Play more lands to unlock higher-CMC targets (need ${5 - landsOnBoard} more for Ashaya).`,
+          `Harmonize cost for X=${best.xCost}: ${harmonizeCost} mana base.`,
+          totalPowerReduction > 0
+            ? `Tap your creatures (total power ${totalPowerReduction}) while casting to reduce generic cost — effective cost drops to ~${reducedCost} mana.`
+            : "Tap your largest creatures while casting to reduce the generic cost by their power.",
+          `Find ${best.name} (CMC ${best.xCost}) — ${best.reason}.`,
+          "After resolving, Nature's Rhythm is exiled permanently — this is your last use.",
         ],
         color: "#5dade2",
       });
@@ -2957,7 +3007,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { name: "Hope Tender",              reason: "exert untaps big land, Kogla resets exert" },
       { name: "Destiny Spinner",          reason: "haste + uncounterable protection" },
       { name: "Wirewood Symbiote",        reason: "untap engine" },
-    ].filter(t => !board.has(t.name));
+    ].filter(t => !board.has(t.name) && !inHand.has(t.name));
 
     const best = pactTargets[0];
     results.push({
@@ -3034,21 +3084,25 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { land: "Wirewood Lodge",          reason: "untaps an elf — enables Argothian Elder loop" },
     ].filter(l => !board.has(l.land));
     if (mycospawnLands.length > 0) {
-      const best = mycospawnLands[0];
       const castable = inHand.has("Sowing Mycospawn") && (mana >= 5 || infiniteManaActive);
-      results.push({
-        priority: castable ? 7 : 6,
-        category: "🏔️ LAND TUTOR",
-        headline: `Sowing Mycospawn → ${best.land}`,
-        detail: `Sowing Mycospawn ({4}{G}): on-cast trigger fetches any land onto the battlefield. Also leaves a 3/3 body with 1 green devotion — fueling Nykthos and Gaea's Cradle simultaneously.`,
-        steps: [
-          castable ? `Cast Sowing Mycospawn ({4}{G}): on-cast, search for ${best.land}.` : `Sowing Mycospawn is on the battlefield — its on-cast tutor already resolved when it entered.`,
-          best.reason.charAt(0).toUpperCase() + best.reason.slice(1) + ".",
-          "3/3 body stays on battlefield, adding devotion and creature count.",
-          ...(mycospawnLands.length > 1 ? [`Other targets: ${mycospawnLands.slice(1,2).map(l => l.land).join(", ")}.`] : []),
-        ],
-        color: "#5dade2",
-      });
+      const alreadyOnBoard = board.has("Sowing Mycospawn");
+      // Only show advice if we can actually cast it this turn, or it's already on the battlefield
+      if (castable || alreadyOnBoard) {
+        const best = mycospawnLands[0];
+        results.push({
+          priority: castable ? 7 : 6,
+          category: "🏔️ LAND TUTOR",
+          headline: `Sowing Mycospawn → ${best.land}`,
+          detail: `Sowing Mycospawn ({4}{G}): on-cast trigger fetches any land onto the battlefield. Also leaves a 3/3 body with 1 green devotion — fueling Nykthos and Gaea's Cradle simultaneously.`,
+          steps: [
+            castable ? `Cast Sowing Mycospawn ({4}{G}): on-cast, search for ${best.land}.` : `Sowing Mycospawn is on the battlefield — its on-cast tutor already resolved when it entered.`,
+            best.reason.charAt(0).toUpperCase() + best.reason.slice(1) + ".",
+            "3/3 body stays on battlefield, adding devotion and creature count.",
+            ...(mycospawnLands.length > 1 ? [`Other targets: ${mycospawnLands.slice(1,2).map(l => l.land).join(", ")}.`] : []),
+          ],
+          color: "#5dade2",
+        });
+      }
     }
   }
 
@@ -3225,9 +3279,9 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       { name: "Woodland Bellower",    cmc: 6, reason: "ETB finds any CMC≤3 creature onto battlefield — 2-for-1 tutor" },
       { name: "Kogla, the Titan Ape", cmc: 6, reason: "destroys a non-land permanent on ETB, bounces Humans" },
       { name: "Regal Force",          cmc: 7, reason: "draw cards equal to creatures on board — often draws 6-10" },
-      { name: "Woodcaller Automaton", cmc: 8, reason: "untaps Cradle/Nykthos with haste — infinite mana with Sabertooth" },
-      { name: "Disciple of Freyalise",cmc: 6, reason: "draw 2+ cards and gain life on ETB, sac engine" },
-    ].filter(t => !board.has(t.name));
+      { name: "Woodcaller Automaton", cmc: 10, reason: "prototype {2}{G}{G} — untaps Cradle/Nykthos with haste. Always cast via prototype; full cost only matters for Yisan/Bellower (neither can fetch it)" },
+      { name: "Disciple of Freyalise",cmc: 5, reason: "ETB: each opponent sacrifices a creature, then you draw cards equal to creatures you control — board wipe + draw engine" },
+    ].filter(t => !board.has(t.name) && !inHand.has(t.name));
     if (empathTargets.length > 0) {
       const castable = inHand.has("Fierce Empath") && (mana >= 3 || infiniteManaActive);
       const etbReady = board.has("Fierce Empath");
@@ -3281,13 +3335,10 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         tutorName = "Green Sun's Zenith (next turn)"; tutorCost = `{${speakerCmc}}{G}`;
         tutorNote = `On your next turn: cast Green Sun's Zenith (X=${speakerCmc}) → Formidable Speaker enters the battlefield directly.`;
         tutorNow = false;
-      } else if ((inHand.has("Elvish Harbinger") || board.has("Elvish Harbinger"))
+      } else if (inHand.has("Elvish Harbinger")
           && (mana >= 3 || infiniteManaActive) && (isMyTurn || yevaFlash)) {
-        const etb = board.has("Elvish Harbinger");
         tutorName = "Elvish Harbinger"; tutorCost = "{2}{G}";
-        tutorNote = etb
-          ? "Elvish Harbinger ETB: search for Formidable Speaker, put it on top of library. Draw it next turn."
-          : `Cast Elvish Harbinger ({2}{G})${!isMyTurn && yevaFlash ? " at instant speed via Yeva" : ""}: ETB puts Formidable Speaker on top of library.`;
+        tutorNote = `Cast Elvish Harbinger ({2}{G})${!isMyTurn && yevaFlash ? " at instant speed via Yeva" : ""}: ETB puts Formidable Speaker on top of library.`;
         tutorNow = isMyTurn || yevaFlash;
       } else if ((inHand.has("Worldly Tutor") || inHand.has("Summoner's Pact"))
           && (mana >= 1 || infiniteManaActive)) {
@@ -3326,9 +3377,9 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   }
 
   // ---- ELVISH HARBINGER ----
-  if (inHand.has("Elvish Harbinger") || board.has("Elvish Harbinger")) {
-    const castable = inHand.has("Elvish Harbinger") && (mana >= 3 || infiniteManaActive);
-    const etbReady = board.has("Elvish Harbinger");
+  if (inHand.has("Elvish Harbinger")) {
+    const castable = mana >= 3 || infiniteManaActive;
+    const etbReady = false; // ETB fires on cast only — already on battlefield means ETB already used
     const canActNow = castable || etbReady;
     // Can cast now at instant speed, or will be able to cast on our next turn
     const canFlashNow = canActNow && (isMyTurn || yevaFlash);
@@ -3411,10 +3462,10 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
 
     // What does each verse counter fetch?
     // verse 1 → CMC 1: Quirion Ranger, Arbor Elf, Wirewood Symbiote, Magus of the Candelabra
-    // verse 2 → CMC 2: Priest of Titania, Wirewood Symbiote (already), Duskwatch Recruiter, Destiny Spinner, Earthcraft
-    // verse 3 → CMC 3: Temur Sabertooth, Circle of Dreams Druid, Hyrax Tower Scout, Eternal Witness, Yisan himself
-    // verse 4 → CMC 4: Argothian Elder, Temur Sabertooth, Fanatic of Rhonas, Karametra's Acolyte, Eladamri
-    // verse 5+ → CMC 5+: Ashaya, Kogla, Woodcaller (8)
+    // verse 2 → CMC 2: Priest of Titania, Fanatic of Rhonas, Duskwatch Recruiter, Destiny Spinner, Earthcraft
+    // verse 3 → CMC 3: Temur Sabertooth, Circle of Dreams Druid, Hyrax Tower Scout, Eladamri, Eternal Witness
+    // verse 4 → CMC 4: Argothian Elder, Karametra's Acolyte
+    // verse 5+ → CMC 5+: Ashaya, Kogla, Woodcaller (prototype {2}{G}{G} but true CMC 10 — Yisan cannot fetch)
     const yisanTargetsByVerse = {
       1: [
         { name: "Quirion Ranger",         reason: "infinite mana loop with Ashaya — the most powerful 1-drop" },
@@ -3425,6 +3476,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       2: [
         { name: "Duskwatch Recruiter",    reason: "win condition — find this first if infinite mana is close" },
         { name: "Priest of Titania",      reason: "big dork tapping for elf count — often 3-6+ mana" },
+        { name: "Fanatic of Rhonas",      reason: "taps for {G}{G}{G}{G} — massive mana dork at CMC 2" },
         { name: "Hope Tender",            reason: "exert untaps Cradle or Nykthos — doubles your biggest land output" },
         { name: "Destiny Spinner",        reason: "haste enabler + land animation for combo sequencing" },
         { name: "Wirewood Symbiote",      reason: "untap engine if not yet in play" },
@@ -3433,14 +3485,13 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       3: [
         { name: "Temur Sabertooth",       reason: "bouncer for infinite ETB loops — core win piece" },
         { name: "Circle of Dreams Druid", reason: "taps for creature count — Gaea's Cradle on a body" },
-        { name: "Hyrax Tower Scout",      reason: "untaps a land on ETB — pairs with Temur Sabertooth for loops" },
+        { name: "Hyrax Tower Scout",      reason: "untaps a creature on ETB — pairs with Temur Sabertooth for loops" },
+        { name: "Eladamri, Korvecdal",    reason: "look at and cast creatures from top of library — tutor engine" },
         { name: "Eternal Witness",        reason: "retrieves key pieces from graveyard" },
       ],
       4: [
         { name: "Argothian Elder",        reason: "2-card infinite mana with Wirewood Lodge (already 2 pieces)" },
-        { name: "Fanatic of Rhonas",      reason: "taps for {4} with Ashaya — big mana dork" },
         { name: "Karametra's Acolyte",    reason: "taps for devotion count — huge in a mono-green deck" },
-        { name: "Eladamri, Korvecdal",    reason: "gives all creatures forestwalk and +1/+1 pump" },
       ],
       5: [
         { name: "Ashaya, Soul of the Wild", reason: "turns all creatures into Forests — enables all infinite mana loops" },
@@ -3510,40 +3561,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   // ---- NATURE'S RHYTHM ----
   // Draw a card whenever a land enters the battlefield under your control.
   // With infinite mana + Elvish Reclaimer looping, or fetch lands still in library,
-  // this becomes a draw engine. With Ashaya, every creature ETB is also a Forest ETB
-  // — but Ashaya makes creatures INTO lands (they tap as Forests), not land drops.
-  // NOTE: Ashaya does NOT trigger landfall from creature casts. Only real land plays trigger.
-  if (board.has("Nature's Rhythm")) {
-    const fetchesLeft   = hand.filter(c => getCard(c)?.tags?.includes("fetch")).length
-      + battlefield.filter(c => getCard(c)?.tags?.includes("fetch")).length;
-    const reclaimerUp   = (board.has("Elvish Reclaimer") || inHand.has("Elvish Reclaimer")) && infiniteManaActive;
-    const cropRotation  = inHand.has("Crop Rotation");
-    const sylvanScrying = inHand.has("Sylvan Scrying");
-
-    const draws = [];
-    if (fetchesLeft > 0)  draws.push(`${fetchesLeft} fetch land${fetchesLeft > 1 ? "s" : ""} available — each crack draws 1`);
-    if (reclaimerUp)      draws.push("Elvish Reclaimer + infinite mana: loop land tutors for continuous draws");
-    if (cropRotation)     draws.push("Crop Rotation fetches a land → draws 1");
-    if (sylvanScrying)    draws.push("Sylvan Scrying finds a land → draws 1");
-
-    if (draws.length > 0) {
-      results.push({
-        priority: infiniteManaActive ? 7 : 4,
-        category: "📖 NATURE'S RHYTHM",
-        headline: `Nature's Rhythm: draw a card for each land that enters`,
-        detail: `Nature's Rhythm draws a card whenever a land enters the battlefield under your control. With fetch lands or Elvish Reclaimer, this generates significant card advantage.`,
-        steps: [
-          "Nature's Rhythm: draw 1 card each time a land ETBs under your control.",
-          ...draws.map(d => `• ${d}.`),
-          ...(reclaimerUp ? [
-            "INFINITE DRAW with Reclaimer: Elvish Reclaimer ({1},{T}: sacrifice a land, fetch any land). Sacrifice the just-fetched land back, loop indefinitely — each land ETB draws 1.",
-            "⚠️ Stop before decking yourself. Switch to Duskwatch or another outlet when you find one.",
-          ] : []),
-        ],
-        color: "#27ae60",
-      });
-    }
-  }
+  // NOTE: Nature's Rhythm is a sorcery — the old landfall-draw engine block has been removed.
 
   // ---- SEEDBORN MUSE ENGINE ----
   // Seedborn Muse untaps ALL your permanents on each opponent's turn.
@@ -4584,12 +4602,13 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       results.push({
         priority: 7,
         category: "🛡️ PROTECTION ACTIVE",
-        headline: `Delighted Halfling: ${legendsInHand[0]} is uncounterable and costs {1} less`,
-        detail: "Delighted Halfling makes legendary spells uncounterable and cost {1} less when you tap it. Key legends in hand are now safe to cast through blue interaction.",
+        headline: `Delighted Halfling: tap to make ${legendsInHand[0]} uncounterable`,
+        detail: "Tap Delighted Halfling when casting a legendary spell to add one mana of any color toward it — that spell can't be countered when cast this way. Key legends in hand are now safe through blue interaction.",
         steps: [
-          `Tap Delighted Halfling when casting ${legendsInHand[0]}: it costs {1} less and cannot be countered.`,
-          legendsInHand.length > 1 ? `Other protected legends in hand: ${legendsInHand.slice(1).join(", ")}.` : "",
-          "Best used proactively when you expect countermagic, or reactively if a counter is held up.",
+          `When casting ${legendsInHand[0]}: tap Delighted Halfling to add {G} (or any color) toward its cost — it becomes uncounterable.`,
+          legendsInHand.length > 1 ? `Other legends in hand that benefit: ${legendsInHand.slice(1).join(", ")}.` : "",
+          "Note: the protection only applies if you use Halfling's mana for the cast. You can use it alongside other mana.",
+          "Best deployed proactively when you see blue mana held up, or in response to a counter being announced.",
         ].filter(Boolean),
         color: "#1abc9c",
       });
@@ -4744,8 +4763,13 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       } else {
         const totalCost = needToCast.reduce((acc, c) => acc + (getCard(c)?.cmc || 0), 0);
         if ((mana >= totalCost || infiniteManaActive) || !isMyTurn) {
+          // Bootstrap scenario: elevate CAST TO ENABLE to priority 13 so it surfaces above
+          // ONE PIECE AWAY results when infinite mana is only reachable (not yet running).
+          const isBootstrapPath = infiniteManaActive && !trueInfiniteManaActive
+            && combo.type === "infinite-mana";
+          const castPriority = isBootstrapPath ? 13 : combo.priority + typeMeta.boost;
           results.push({
-            priority: combo.priority + typeMeta.boost,
+            priority: castPriority,
             category: typeMeta.cast,
             headline: `Cast ${needToCast.join(" + ")} → ${combo.name}`,
             detail: `You have all named pieces! Cast ${needToCast.join(", ")} to complete ${combo.name}.`,
@@ -4762,6 +4786,14 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       // doesn't count as "owning" a piece — avoids noise on empty/locked boards.
       if (combo.type !== "infinite-mana" || !infiniteManaActive) {
         const missingCard = missing[0];
+        const missingData = getCard(missingCard);
+        const missingCmc = missingData?.cmc ?? 0;
+        const missingPips = missingData?.greenPips ?? Math.min(missingCmc, missingData?.devotion ?? 0);
+        // Suppress if we couldn't afford to cast the missing piece even if we had it now.
+        const canAffordMissing = infiniteManaActive || missingCmc === 0 || mana >= missingCmc;
+        if (!canAffordMissing) {
+          // Can't cast the piece even if we find it — suppress
+        } else {
         const ownedAccessible = combo.requires.filter(r => r !== missingCard && (
           board.has(r) || (inHand.has(r) && canCastNow)
         ));
@@ -4799,6 +4831,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
           color: speakerIsTutor ? "#e67e22" : "#58d68d",
         });
         } // end inDeck check
+        } // end canAfford check
       }
     } else if (missing.length === 0 && !extras.ok) {
       // Named pieces present but need an extra condition satisfied.
@@ -4927,7 +4960,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   // Woodland Bellower: ETB puts any non-legendary green creature CMC <= 3 directly onto battlefield.
   // Castable on our turn (sorcery speed) or with Yeva flash. Already-on-board means ETB already fired.
   const bellowerInHand    = accessible("Woodland Bellower");
-  const bellowerCastable  = bellowerInHand && (isMyTurn || yevaAvailable);
+  const bellowerCastable  = bellowerInHand && (isMyTurn || yevaAvailable) && (mana >= 6 || infiniteManaActive);
   // Bellower can find: Duskwatch, Eternal Witness, Endurance, Destiny Spinner, Elvish Reclaimer,
   // Fauna Shaman (discard to tutor), Formidable Speaker (discard → full library search), Hyrax Tower Scout, Quirion Ranger, Scryb Ranger,
   // Priest of Titania, Elvish Archdruid, Circle of Dreams Druid, Magus of the Candelabra, etc.
@@ -4996,7 +5029,8 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   const castYevaFirst = !isMyTurn && !yevaFlash && yevaAvailable;
 
   if (duskwatchCastable && (infiniteManaActive || mana >= 20)) {
-    // Determine which Sanitarium untap method is available
+    // Determine which Sanitarium untap method is available — MUST be on the board already
+    // (not just in hand) because Sanitarium mill requires the loop to already be running.
     const untapMethods = [];
     if (board.has("Woodcaller Automaton") && board.has("Temur Sabertooth"))
       untapMethods.push("Woodcaller Automaton + Temur Sabertooth");
@@ -5010,6 +5044,24 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       untapMethods.push(`Ashaya + Wirewood Symbiote + ${badgermoleActive ? "Badgermole Cub" : "Destiny Spinner"} (haste)`);
     if (board.has("Ashaya, Soul of the Wild") && board.has("Argothian Elder") && hasLandAnimate)
       untapMethods.push(`Ashaya + Argothian Elder + ${badgermoleActive ? "Badgermole Cub" : "Destiny Spinner"} (haste)`);
+
+    // Only show WIN NOW if an untap method is actually established on the board,
+    // OR if infinite mana is truly running (not bootstrap). When bootstrap-only,
+    // suppress WIN NOW and let CAST TO ENABLE surface the correct next action.
+    const loopTrulyReady = untapMethods.length > 0 || trueInfiniteManaActive;
+    if (!loopTrulyReady && infiniteManaActive) {
+      // Bootstrap scenario: pieces still need to be cast. Downgrade to a reminder.
+      // The CAST TO ENABLE MANA LOOP advice will surface the correct next action.
+      results.push({
+        priority: 9,
+        isSuppressed: false,
+        category: "⏳ WIN PENDING SETUP",
+        headline: `${duskwatchAccessNote}Win pile ready once infinite mana loop is established`,
+        detail: "Infinite mana is within reach but the loop pieces haven't been cast yet. Cast the pieces shown in CAST TO ENABLE MANA LOOP first, then Duskwatch will assemble the win pile.",
+        steps: ["Complete the mana loop setup first (see CAST TO ENABLE MANA LOOP advice above).", `Then: ${duskwatchAccessNote}activate Duskwatch to pull the win pile.`],
+        color: "#7f8c8d",
+      });
+    } else {
 
     // Determine which pile pieces are already on board
     const pileNeeded = ["Destiny Spinner","Elvish Reclaimer","Ashaya, Soul of the Wild",
@@ -5043,6 +5095,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       ],
       color: "#ff6b35",
     });
+    } // end else (loop truly ready)
   }
 
   // ---- ELVISH RECLAIMER — LAND TUTOR ----
@@ -5101,8 +5154,8 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         reason: "Untaps any land including Gaea's Cradle, Nykthos, or Geier Reach Sanitarium. Key for mill loop.",
         priority: (board.has("Gaea's Cradle") || board.has("Itlimoc, Cradle of the Sun") || board.has("Nykthos, Shrine to Nyx")) ? 8 : 5 },
       { land: "Yavimaya, Cradle of Growth", missing: !board.has("Yavimaya, Cradle of Growth"),
-        reason: "Makes all lands Forests for all players. Enables Eladamri forestwalk win, Argothian Elder combos, and Earthcraft with all creatures.",
-        priority: board.has("Eladamri, Korvecdal") ? 8 : 5 },
+        reason: "Makes all lands Forests for all players. Enables Earthcraft with all creatures, Argothian Elder untap loops, and Arbor Elf tapping any land.",
+        priority: board.has("Argothian Elder") ? 8 : 5 },
       { land: "Boseiju, Who Endures",   missing: !board.has("Boseiju, Who Endures"),
         reason: "Instant-speed removal for problematic enchantments, artifacts, or lands. Channel ability is uncounterable.",
         priority: 4 },
@@ -5454,14 +5507,19 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
     const quirionInLoop    = board.has("Quirion Ranger") || board.has("Scryb Ranger");
     const quirionLoopName  = board.has("Quirion Ranger") ? "Quirion Ranger" : "Scryb Ranger";
     const ashayaNotOnBoard = !board.has("Ashaya, Soul of the Wild");
-    const canCastSpeakerNow = speakerInHandNow && (isMyTurn || yevaFlash) && mana >= 3; // free flash only; command-zone handled by canCastYevaThenSpeaker
-    const winLineAvailable  = speakerInHandNow && mana >= 3;
+    const ashayaOnBoard = board.has("Ashaya, Soul of the Wild");
+    // When Ashaya is NOT on board, Speaker's ETB puts her in hand — we still have to cast her (CMC 5).
+    // Minimum mana to execute the full sequence this turn: Speaker(3) + Ashaya(5) = 8.
+    // When Ashaya IS already on board, we only need Speaker(3).
+    const minManaForWin = ashayaOnBoard ? 3 : 8;
+    const canCastSpeakerNow = speakerInHandNow && (isMyTurn || yevaFlash) && mana >= minManaForWin;
+    const winLineAvailable  = speakerInHandNow && mana >= minManaForWin;
     // Speaker ETB requires discarding another card — if Speaker is the only card in hand, ETB fizzles.
     const hasDiscardForSpeaker = hand.filter(c => c !== "Formidable Speaker").length > 0;
     // Yeva in hand: casting her first gives flash to all green creatures this turn.
     // Yeva costs {2}{G}{G} = 4. Speaker costs {2}{G} = 3. Total = 7 to do both this opponent's turn.
     const yevaInHand = inHand.has("Yeva, Nature's Herald") && !board.has("Yeva, Nature's Herald");
-    const canCastYevaThenSpeaker = !isMyTurn && !yevaFlash && yevaAvailable && mana >= 7;
+    const canCastYevaThenSpeaker = !isMyTurn && !yevaFlash && yevaAvailable && mana >= (4 + minManaForWin);
 
     if (speakerInHandNow && quirionInLoop && winLineAvailable && hasDiscardForSpeaker && !infiniteManaActive) {
       // Estimate dork output AFTER Speaker enters (+1 elf = +1 mana for elf-counting dorks)
@@ -5469,6 +5527,11 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
       const postCastElves = elvesOnBoard + speakerElvBonus;
       const dorkForLoop = [...battlefield, ...hand].find(c => {
         if (!getCard(c)?.tags?.includes("big-dork") && !getCard(c)?.tags?.includes("dork")) return false;
+        // If dork is in hand, we must have enough mana to cast it AND Speaker this turn
+        if (inHand.has(c)) {
+          const dorkCmc = getCard(c)?.cmc ?? 0;
+          if (mana < 3 + dorkCmc) return false; // can't afford both
+        }
         const t = getCard(c)?.tapsFor;
         if (typeof t === "number") return t >= 3;
         if (t === "elves")     return postCastElves >= 3;
@@ -5527,8 +5590,9 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
           });
         } else {
           // No flash available, not our turn — flag as next-turn priority with Yeva hint
-          const yevaHint = mana < 7
-            ? ` (Need ${7 - mana} more mana to cast Yeva from command zone + Speaker this turn.)`
+          const yevaTarget = 4 + minManaForWin;
+          const yevaHint = mana < yevaTarget
+            ? ` (Need ${yevaTarget - mana} more mana to cast Yeva + Speaker${ashayaOnBoard ? "" : " + Ashaya"} this turn.)`
             : "";
           results.push({
             priority: 14,
@@ -5759,7 +5823,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
           `Disciple ETB: each opponent sacrifices a creature. You draw ${crCount} cards.`,
           bouncer2 === "Temur Sabertooth"
             ? "Pay {1}{G}: Temur Sabertooth bounces Disciple. Recast. ETB again."
-            : "Pay {2}: Kogla returns Disciple (Human) to hand. Recast. ETB again.",
+            : "Pay {1}{G}: Temur Sabertooth bounces Disciple (Elf — Kogla only bounces Humans). Recast. ETB again.",
           "Each loop removes one creature from each opponent's board.",
           "After clearing opponents' boards: each loop draws your library.",
           "Win via Duskwatch Recruiter, Sanitarium mill, or Infectious Bite from hand.",
@@ -5939,25 +6003,7 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
 
 
   // ---- NATURE'S RHYTHM DRAW ENGINE ----
-  if (board.has("Nature's Rhythm") && infiniteManaActive) {
-    const reclaimerPresent = board.has("Elvish Reclaimer") || inHand.has("Elvish Reclaimer");
-    if (reclaimerPresent) {
-      results.push({
-        priority: 11,
-        category: "📚 DRAW YOUR LIBRARY",
-        headline: "Nature's Rhythm + Elvish Reclaimer + inf mana: draw entire library",
-        detail: "Nature's Rhythm draws a card whenever you play a land. With infinite mana, activate Elvish Reclaimer repeatedly -- each activation tutors a land to the battlefield, triggering Nature's Rhythm.",
-        steps: [
-          "Infinite mana active. Nature's Rhythm on battlefield. Elvish Reclaimer available.",
-          "Pay {T} + sacrifice a land: Elvish Reclaimer searches for any land and puts it onto the battlefield.",
-          "That land entering triggers Nature's Rhythm: draw a card.",
-          "Repeat with infinite mana to draw your entire library.",
-          "Win via Duskwatch Recruiter, Sanitarium mill, or Infectious Bite from hand.",
-        ],
-        color: "#5dade2",
-      });
-    }
-  }
+  // Nature's Rhythm is a sorcery — it cannot sit on the board. Block removed.
 
   // ---- INFINITE MANA — NO WIN CONDITION REACHABLE ----
   // If infinite mana is active but no win-con advice has fired at high priority,
@@ -6169,7 +6215,9 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
         // Already covered by ONE PIECE AWAY — skip
         continue;
       }
-      if (missing.length === 0) {
+      // mustPreExist cards must actually be on the battlefield (not just accessible)
+      const preExistMissing = (combo.mustPreExist ?? []).filter(r => !board.has(r));
+      if (missing.length === 0 && preExistMissing.length === 0) {
         const extras = comboExtrasSatisfied(combo, infiniteManaActive);
         if (!extras.ok && extras.missing) {
           suppressedWins.push({ label: `Infinite mana suppressed (${combo.name})`, reason: `missing ${extras.missing}` });
@@ -6179,8 +6227,11 @@ function analyzeGameState({ hand, battlefield, graveyard, manaAvailable, isMyTur
   }
 
   // Emit suppressed wins as low-priority collapsed entries
+  const seenReasons = new Set();
   for (const s of suppressedWins) {
-    if (results.some(r => r.suppressedLabel === s.label)) continue; // no dups
+    if (results.some(r => r.suppressedLabel === s.label)) continue; // no dups by label
+    if (seenReasons.has(s.reason)) continue; // no dups by identical reason text
+    seenReasons.add(s.reason);
     results.push({
       priority: -1,
       category: "🔕 SUPPRESSED",
@@ -6469,7 +6520,7 @@ function getTutorOptions(target, hand, battlefield, mana, infiniteMana = false, 
         && speakerDiscardAvail
         && (mana >= 3 || infiniteMana)) options.push("Formidable Speaker (cast → ETB finds any creature)");
     // Elvish Harbinger: ETB puts any elf on top of library. Cost {2}{G}, elf itself.
-    if ((inHand.has("Elvish Harbinger") || board.has("Elvish Harbinger"))
+    if (inHand.has("Elvish Harbinger")
         && getCard(target)?.tags?.includes("elf")
         && (mana >= 3 || infiniteMana)) options.push("Elvish Harbinger (ETB → top of library next draw)");
     if (accessible("Worldly Tutor") && (mana >= 1 + (inGrave.has("Worldly Tutor") ? 3 : 0) || infiniteMana) && getCard(target)?.type === "creature") options.push("Worldly Tutor");
@@ -7156,9 +7207,19 @@ function useScryfallImage(name) {
     fetch(`https://api.scryfall.com/cards/named?exact=${encoded}`)
       .then(r => r.json())
       .then(data => {
-        const imgUrl = data?.image_uris?.normal
-          || data?.card_faces?.[0]?.image_uris?.normal
-          || "error";
+        let imgUrl;
+        if (data?.image_uris?.normal) {
+          // Single-faced card
+          imgUrl = data.image_uris.normal;
+        } else if (data?.card_faces) {
+          // DFC: pick the face whose name matches what we asked for
+          const faces = data.card_faces;
+          const matchIdx = faces.findIndex(f => f.name?.toLowerCase() === name.toLowerCase());
+          const face = faces[matchIdx !== -1 ? matchIdx : 0];
+          imgUrl = face?.image_uris?.normal || "error";
+        } else {
+          imgUrl = "error";
+        }
         scryfallCache.set(name, imgUrl);
         setUrl(imgUrl);
       })
@@ -8426,6 +8487,26 @@ function DeckDetailModal({ deck, onClose, onSave }) {
           {onSave && !editMode && (
             <button onClick={() => setEditMode(true)} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "4px", color: COLORS.textDim, cursor: "pointer", fontSize: "11px", padding: "4px 10px", fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>✏ EDIT</button>
           )}
+          {!editMode && (() => {
+            // Build Moxfield-format decklist (1x Name per unique card, multiples for basics)
+            const exportText = Object.entries(counts).map(([name, qty]) => `${qty} ${name}`).join("\n");
+            return (
+              <button onClick={() => {
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(exportText).then(() => {
+                    // brief visual feedback via title change — no state needed
+                  });
+                }
+                // Fallback: open in textarea overlay
+                const ta = document.createElement("textarea");
+                ta.value = exportText;
+                ta.style.cssText = "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:400px;height:300px;z-index:9999;background:#0d1f0d;color:#ccc;border:1px solid #2a4a2a;border-radius:8px;padding:12px;font-size:12px;font-family:monospace";
+                document.body.appendChild(ta);
+                ta.select();
+                setTimeout(() => document.body.removeChild(ta), 8000);
+              }} title="Copy decklist to clipboard (Moxfield format)" style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "4px", color: COLORS.textDim, cursor: "pointer", fontSize: "11px", padding: "4px 10px", fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>⬆ EXPORT</button>
+            );
+          })()}
           {editMode && dirty && (
             <button onClick={handleSave} style={{ background: "#1a3a1a", border: `1px solid ${COLORS.green1}`, borderRadius: "4px", color: COLORS.text, cursor: "pointer", fontSize: "11px", padding: "4px 10px", fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>✓ SAVE</button>
           )}
@@ -8642,6 +8723,51 @@ function DeckManager({ decks, activeDeckId, onSaveDecks, onSetActive, onClose })
   const [importName, setImportName]     = useState("");
   const [importError, setImportError]   = useState("");
   const [saveStatus, setSaveStatus]     = useState(""); // "" | "saving" | "saved" | "error"
+  const [backupStatus, setBackupStatus]       = useState(""); // "" | "ok" | "err"
+  const [restoreStatus, setRestoreStatus]     = useState(""); // "" | "ok" | "err"
+  const [confirmDeleteDeck, setConfirmDeleteDeck] = useState(null); // deck id pending confirmation
+  const restoreInputRef = useRef(null);
+
+  function handleBackup() {
+    try {
+      const SKIP = new Set(["yeva_scryfall_data_v1"]); // skip large image cache
+      const data = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith("yeva") || k.startsWith("goldfish-stats"))) {
+          if (!SKIP.has(k)) data[k] = localStorage.getItem(k);
+        }
+      }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `yeva-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupStatus("ok");
+      setTimeout(() => setBackupStatus(""), 2000);
+    } catch { setBackupStatus("err"); setTimeout(() => setBackupStatus(""), 2000); }
+  }
+
+  function handleRestoreFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid format");
+        for (const [k, v] of Object.entries(data)) {
+          if (typeof v === "string") localStorage.setItem(k, v);
+        }
+        setRestoreStatus("ok");
+        setTimeout(() => { setRestoreStatus(""); window.location.reload(); }, 800);
+      } catch { setRestoreStatus("err"); setTimeout(() => setRestoreStatus(""), 2000); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
   // Scryfall enrichment: deckId → "idle"|"fetching"|"done"|"partial"|"failed"
   const [enrichStatus, setEnrichStatus] = useState({});
   const [, forceEnrichUpdate] = useState(0);
@@ -8723,8 +8849,21 @@ function DeckManager({ decks, activeDeckId, onSaveDecks, onSetActive, onClose })
             <button onClick={() => setShowCompare(true)} style={{ ...btnStyle(false), marginRight: "6px" }}>⚖ COMPARE</button>
           )}
           {!showImport && (
-            <button onClick={() => setShowImport(true)} style={{ ...btnStyle(false), marginRight: "10px" }}>+ IMPORT</button>
+            <button onClick={() => setShowImport(true)} style={{ ...btnStyle(false), marginRight: "6px" }}>+ IMPORT</button>
           )}
+          {!showImport && (<>
+            <input ref={restoreInputRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleRestoreFile} />
+            <button
+              onClick={handleBackup}
+              title="Download all decks, saved states, and simulator history as a JSON file"
+              style={{ ...btnStyle(false), marginRight: "6px", ...(backupStatus === "ok" ? { background: "#27ae60" } : backupStatus === "err" ? { background: "#c0392b" } : {}) }}
+            >⬇ BACKUP</button>
+            <button
+              onClick={() => restoreInputRef.current?.click()}
+              title="Restore from a previously saved backup JSON file (reloads the page)"
+              style={{ ...btnStyle(false), marginRight: "10px", ...(restoreStatus === "ok" ? { background: "#27ae60" } : restoreStatus === "err" ? { background: "#c0392b" } : {}) }}
+            >⬆ RESTORE</button>
+          </>)}
           <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: "18px", flexShrink: 0 }}>✕</button>
         </div>
 
@@ -8842,7 +8981,14 @@ function DeckManager({ decks, activeDeckId, onSaveDecks, onSetActive, onClose })
                   {activeDeckId === deck.id && <span style={{ color: COLORS.green1 }}>✓</span>}
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); setViewingDeck(deck); }} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "4px", padding: "3px 8px", color: COLORS.textDim, cursor: "pointer", fontSize: "11px" }}>👁</button>
-                <button onClick={() => deleteDeck(deck.id)} style={{ background: "none", border: `1px solid #5a1a1a`, borderRadius: "4px", padding: "3px 8px", color: "#e74c3c88", cursor: "pointer", fontSize: "11px" }}>✕</button>
+                {confirmDeleteDeck === deck.id ? (
+                  <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                    <button onClick={(e) => { e.stopPropagation(); deleteDeck(deck.id); setConfirmDeleteDeck(null); }} style={{ background: "#3a0a0a", border: "1px solid #e74c3c44", borderRadius: "4px", color: "#e74c3c", cursor: "pointer", fontSize: "11px", padding: "3px 8px" }}>Delete</button>
+                    <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteDeck(null); }} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: "4px", color: COLORS.textDim, cursor: "pointer", fontSize: "11px", padding: "3px 8px" }}>Cancel</button>
+                  </div>
+                ) : (
+                  <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteDeck(deck.id); }} style={{ background: "none", border: `1px solid #5a1a1a`, borderRadius: "4px", padding: "3px 8px", color: "#e74c3c88", cursor: "pointer", fontSize: "11px" }}>✕</button>
+                )}
               </div>
             )})}
           </div>
@@ -8888,6 +9034,7 @@ function HelpModal({ onClose, onStartTour }) {
     { id: "goldfish",   label: "Goldfish" },
     { id: "shortcuts",  label: "Shortcuts" },
     { id: "combos",     label: "Combos" },
+    { id: "rulings",    label: "Rulings" },
     { id: "tour",       label: "Tour" },
     { id: "changelog",  label: "What's New" },
   ];
@@ -8950,7 +9097,7 @@ function HelpModal({ onClose, onStartTour }) {
         <P>Goldfish mode simulates playing the deck alone — no opponent — to test how consistently it assembles its combo. You draw opening hands, play through turns, and track milestones.</P>
         <H>PLAYING A GAME</H>
         <Tip label="Opening hand">You start with 7 cards. Click KEEP to keep the hand or MULLIGAN to take a new one (one fewer card each time). Cards sent to the bottom are chosen before you see the new hand.</Tip>
-        <Tip label="Playing cards">Click any card in your hand to play it. Lands go to the battlefield, instants/sorceries go to the graveyard. The land-played indicator shows whether you've played your land for the turn.</Tip>
+        <Tip label="Playing cards">Click any card in your hand to play it. Lands go to the battlefield, instants/sorceries go to the graveyard. The land-played indicator shows whether you've played your land for the turn. When you cast a creature, the advisor automatically taps your cheapest available mana sources to cover its cost and updates the mana pool accordingly.</Tip>
         <Tip label="Tapping permanents">Click a card on the battlefield to tap or untap it. Mana-producing cards automatically update the mana pool. The pool badge shows your current floating mana.</Tip>
         <Tip label="Mana pool">The pool tracks mana as you tap sources and cast spells. Use − and + to adjust manually. It resets to 0 at the start of each turn.</Tip>
         <Tip label="Context menu">Right-click any card to move it between zones, crack fetch lands, or access other actions.</Tip>
@@ -8959,9 +9106,10 @@ function HelpModal({ onClose, onStartTour }) {
         <Tip label="↺ UNTAP">Untaps all permanents without advancing the turn. Use this mid-turn for Wirewood Lodge effects.</Tip>
         <Tip label="🔍 TUTOR">Search your library by card name, type, or tag (e.g. type 'dork' to find all mana creatures).</Tip>
         <Tip label="⚡ TAP ALL">Taps all untapped mana sources at once and fills the pool to its maximum for the turn.</Tip>
-        <Tip label="↩ UNDO">Reverts the last action. Up to 20 levels of undo are stored per game.</Tip>
+        <Tip label="↩ UNDO">Reverts the last action, including casting Yeva from the command zone. Up to 20 levels of undo are stored per game.</Tip>
         <Tip label="👁 SCRY">Look at the top cards of your library and choose which to keep on top or send to the bottom.</Tip>
-        <Tip label="🌿 YEVA">Cast Yeva from the command zone. Tax increases by 2 each time she's cast.</Tip>
+        <Tip label="🌿 YEVA">Cast Yeva from the command zone. Tax increases by 2 each time she's cast. Fully undoable with Ctrl+Z.</Tip>
+        <Tip label="🃏 IMAGE / 📋 LIST">Toggle between text list view and card image playfield view. In image view, cards display as full card art — click to tap/cast as normal, right-click for the context menu. Tapped cards rotate 90°. Hover any card for a full-size preview.</Tip>
         <H>STATISTICS</H>
         <Tip label="Game log">The right panel records every action taken this game. Scroll down to see earlier turns.</Tip>
         <Tip label="★ END GAME">Records the game result, turn count, milestones, and opening hand. Adds to your stats history.</Tip>
@@ -9011,6 +9159,45 @@ function HelpModal({ onClose, onStartTour }) {
         <Tip label="Gaea's Cradle / Itlimoc">Taps for mana equal to the number of creatures you control. Goes infinite with any untap effect and enough creatures.</Tip>
       </>
     ),
+    rulings: (() => {
+      const Rule = ({ id, children }) => (
+        <div style={{ marginBottom: "8px" }}>
+          <span style={{ color: COLORS.textDim, fontFamily: "monospace", fontSize: "11px", marginRight: "8px" }}>{id}</span>
+          <span style={{ color: COLORS.text, fontSize: "13px", fontFamily: "'Crimson Text', serif", lineHeight: "1.6" }}>{children}</span>
+        </div>
+      );
+      const RulingBox = ({ title, children }) => (
+        <div style={{ background: "#0a1a0a", border: `1px solid ${COLORS.border}`, borderRadius: "8px", padding: "16px", marginBottom: "20px" }}>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: "12px", color: COLORS.gold, letterSpacing: "1px", marginBottom: "14px" }}>{title}</div>
+          {children}
+        </div>
+      );
+      const Note = ({ children }) => (
+        <div style={{ background: "#0d200d", border: `1px solid ${COLORS.green1}44`, borderRadius: "6px", padding: "10px 14px", marginTop: "12px", fontSize: "13px", color: COLORS.text, fontFamily: "'Crimson Text', serif", lineHeight: "1.7" }}>
+          {children}
+        </div>
+      );
+      return (
+        <>
+          <H>RULES RULINGS</H>
+          <P>Edge-case rules clarifications relevant to this deck.</P>
+
+          <RulingBox title="DISCARD YEVA AT END STEP — CLEANUP STEP RULING">
+            <P style={{ marginBottom: "14px" }}>Two things cause priority to be passed at the beginning of a cleanup step: abilities triggering, or state-based actions being performed.</P>
+            <Rule id="514.1">First, if the active player's hand contains more cards than their maximum hand size (normally seven), they discard enough cards to reduce their hand size to that number. This turn-based action doesn't use the stack.</Rule>
+            <Rule id="514.2">Second, the following actions happen simultaneously: all damage marked on permanents (including phased-out permanents) is removed and all "until end of turn" and "this turn" effects end. This turn-based action doesn't use the stack.</Rule>
+            <Rule id="514.3">Normally, no player receives priority during the cleanup step, so no spells can be cast and no abilities can be activated. However, this rule is subject to the following exception:</Rule>
+            <Rule id="514.3a">At this point, the game checks to see if any state-based actions would be performed and/or any triggered abilities are waiting to be put onto the stack (including those that trigger "at the beginning of the next cleanup step"). If so, those state-based actions are performed, then those triggered abilities are put on the stack, then the active player gets priority. Players may cast spells and activate abilities. Once the stack is empty and all players pass in succession, another cleanup step begins.</Rule>
+            <Note>
+              <strong>In order:</strong> you discard your commander (e.g. Yeva), the effect from Angel's Grace ends, you put your commander in the command zone as a state-based effect, and you receive priority.
+              <br /><br />
+              There will be an additional cleanup step after the current one ends, where you might have to discard again, and any new "until end of turn" effects created in the first cleanup end. This continues until a cleanup step completes with no triggers or state-based actions causing priority to be passed.
+            </Note>
+          </RulingBox>
+        </>
+      );
+    })(),
+
     tour: (
       <>
         <H>INTERACTIVE TOUR</H>
@@ -9034,6 +9221,17 @@ function HelpModal({ onClose, onStartTour }) {
     ),
     changelog: (() => {
       const versions = [
+        {
+          version: "1.9.0", date: "2026-03-07", title: "Card Image Playfield View",
+          added: [
+            "Card image playfield view in Goldfish — toggle with the 🃏 IMAGE button in the controls strip. Displays hand, battlefield, graveyard, and exile as real Scryfall card art. Click to cast/tap, right-click for context menu, hover for a full-size preview. Images load live from Scryfall and are cached for the session.",
+            "Tapped cards rotate 90° with a smooth CSS transition. Counter badges stay upright. Battlefield is split into Creatures/Spells and Lands rows.",
+            "The toggle button always shows where it will take you — reads IMAGE when in list mode, LIST when in image mode.",
+          ],
+          fixed: [
+            "Yeva cast from command zone is now fully undoable with Ctrl+Z (pushUndo was missing from castYeva).",
+          ],
+        },
         {
           version: "1.8.0", date: "2026-03-06", title: "Advisor Intelligence & Card Coverage",
           added: [
@@ -9174,7 +9372,7 @@ function HelpModal({ onClose, onStartTour }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000000dd", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }} onClick={onClose}>
-      <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.borderBright}`, borderRadius: "12px", width: "100%", maxWidth: "680px", maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.borderBright}`, borderRadius: "12px", width: "100%", maxWidth: "820px", maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div style={{ padding: "14px 52px 14px 20px", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0, position: "relative" }}>
@@ -9482,11 +9680,13 @@ function HoverCard({ card, children }) {
 //   4. Advance turn (untap, draw)
 //   Repeat until win or turn 20 (hard cap)
 
-const WIN_CATS = ["WIN NOW", "CAST TO WIN", "WIN NEXT TURN", "INSTANT SPEED WIN",
+const WIN_CATS = ["WIN NOW", "CAST TO WIN", "INSTANT SPEED WIN",
                   "WIN — PILE", "WIN — FETCH", "POISON WIN", "CAST FOR WIN",
-                  "TUTOR LOOP", "WIN NEXT"];
+                  "TUTOR LOOP"];
 
 function isWinCategory(cat) {
+  // Use exact substring matches to avoid "CAST FOR WIN NEXT TURN" matching "CAST FOR WIN"
+  if (cat.includes("NEXT TURN")) return false;
   return WIN_CATS.some(w => cat.includes(w));
 }
 
@@ -9511,10 +9711,9 @@ function extractPlayableCard(result, hand, battlefield) {
 function selectBottomsFromScored(scored, bottomCount) {
   if (bottomCount <= 0 || scored.length === 0) return [];
   const GREEN_LANDS_SET = new Set([
-    "Forest","Dryad Arbor","Misty Rainforest","Verdant Catacombs","Windswept Heath",
-    "Wooded Foothills","Yavimaya, Cradle of Growth","Castle Garenbrig",
-    "Turntimber Symbiosis","Shifting Woodland","Gaea's Cradle","Itlimoc, Cradle of the Sun",
-    "Nykthos, Shrine to Nyx",
+    "Forest",
+    "Misty Rainforest","Verdant Catacombs","Windswept Heath","Wooded Foothills",
+    "Yavimaya, Cradle of Growth","Castle Garenbrig","Turntimber Symbiosis",
   ]);
   const allCards = scored.map(x => x.c);
   const greenLandCount = allCards.filter(c => GREEN_LANDS_SET.has(c)).length;
@@ -9552,6 +9751,89 @@ function selectBottomsFromScored(scored, bottomCount) {
   return result.map(x => x.c);
 }
 
+// ── Simulator mana pool: tracks green vs colorless separately ─────────────────
+// Used only by simulateOneGame. The live UI continues to use calculateBattlefieldMana.
+function calculateSimManaPool(battlefield, sickSet = null) {
+  const board = new Set(battlefield);
+  const creatures = battlefield.filter(c => getCard(c)?.type === "creature");
+  const elves = creatures.filter(c => getCard(c)?.tags?.includes("elf")).length;
+  const creatureCount = creatures.length;
+  const devotion = battlefield.reduce((s, c) => s + (getCard(c)?.devotion ?? 0), 0);
+  const hasBadgermole = board.has("Badgermole Cub");
+  const badgermoleBonus = hasBadgermole ? 1 : 0;
+  const hasYavimaya = board.has("Yavimaya, Cradle of Growth");
+  const hasAura = board.has("Utopia Sprawl") || board.has("Wild Growth");
+  const hasCradle = board.has("Gaea's Cradle");
+  const hasNykthos = board.has("Nykthos, Shrine to Nyx");
+
+  let green = 0;
+  let colorless = 0;
+
+  for (const card of battlefield) {
+    const data = getCard(card);
+    if (!data) continue;
+    // Summoning-sick dorks can't tap
+    if (sickSet?.has(card) && (data.tags?.includes("dork") || data.tags?.includes("big-dork"))) continue;
+
+    if (data.type === "land") {
+      if (card === "Gaea's Cradle" || card === "Itlimoc, Cradle of the Sun") {
+        green += creatureCount; // taps for {G} per creature
+      } else if (card === "Nykthos, Shrine to Nyx") {
+        green += devotion === 0 ? 0 : Math.max(1, devotion - 2);
+      } else if (card === "Ancient Tomb") {
+        colorless += 2; // {C}{C} — cannot cast green-pip spells
+      } else if (data.tags?.includes("fetch") || data.tags?.includes("sick")) {
+        // fetch cracked already; fetched land entering tapped is in sickSet
+      } else {
+        green += 1; // Forest, Yavimaya, etc — produce {G}
+      }
+    } else if (data.tags?.includes("dork") || data.tags?.includes("big-dork")) {
+      const t = data.tapsFor;
+      let amt = 0;
+      if (typeof t === "number") amt = t + (t > 0 ? badgermoleBonus : 0);
+      else if (t === "elves")    amt = elves + badgermoleBonus;
+      else if (t === "creatures") amt = creatureCount + badgermoleBonus;
+      else if (t === "devotion") amt = devotion + badgermoleBonus;
+      else if (t === "arbor") {
+        if (hasYavimaya && (hasCradle || hasNykthos))
+          amt = Math.max(creatureCount, devotion - 2) + badgermoleBonus;
+        else if (hasAura) amt = 2 + badgermoleBonus;
+        else amt = 1 + badgermoleBonus;
+      } else {
+        amt = 1 + badgermoleBonus;
+      }
+      green += amt; // dorks tap for {G}
+    } else if (data.tags?.includes("rock")) {
+      if (card === "Sol Ring") colorless += 2;       // {C}{C}
+      else if (card === "Chrome Mox") green += 1;    // imprinted green card assumed
+      else if (card === "Mox Diamond") green += 1;   // discard land for {G}
+      else if (card === "Lotus Petal") green += 1;   // sacrifice for {G}
+    }
+  }
+
+  // Earthcraft: each non-sick creature can untap a basic land for extra mana
+  if (board.has("Earthcraft")) {
+    const basicForests = battlefield.filter(c =>
+      getCard(c)?.tags?.includes("basic") || getCard(c)?.tags?.includes("forest")
+    ).length;
+    const availableCreatures = creatures.filter(c => !sickSet?.has(c)).length;
+    const earthcraftBonus = Math.min(availableCreatures, basicForests);
+    green += earthcraftBonus;
+  }
+
+  return { green, colorless, total: green + colorless };
+}
+
+// Can a card be affordably cast given a {green, colorless} mana pool?
+function simCanCast(card, manaPool) {
+  const data = getCard(card);
+  if (!data) return false;
+  const cmc = data.cmc ?? 0;
+  const pips = data.greenPips ?? (data.type !== "land" ? Math.min(cmc, data.devotion ?? 0) : 0);
+  // Need enough green for the pips, and total mana >= cmc
+  return manaPool.green >= pips && manaPool.total >= cmc;
+}
+
 function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
   const MAX_TURNS = maxTurns;
   let hand, library;
@@ -9563,11 +9845,15 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
   //   • At least one 1-CMC mana dork (Llanowar Elves, Arbor Elf, etc.) — the deck's
   //     primary T1 play that enables everything else
   //   • Some additional action (tutor, second dork, or combo piece)
+  // Lands that can produce green mana on T1 (or find one that can via fetch).
+  // Excludes: Gaea's Cradle/Nykthos (0 mana T1), Ancient Tomb ({C}{C} only),
+  // Shifting Woodland (needs a basic in play), Dryad Arbor (summoning sick T1).
   const GREEN_LANDS = new Set([
-    "Forest","Dryad Arbor","Misty Rainforest","Verdant Catacombs","Windswept Heath",
-    "Wooded Foothills","Yavimaya, Cradle of Growth","Castle Garenbrig",
-    "Turntimber Symbiosis","Shifting Woodland","Gaea's Cradle","Itlimoc, Cradle of the Sun",
-    "Nykthos, Shrine to Nyx",
+    "Forest",
+    "Misty Rainforest","Verdant Catacombs","Windswept Heath","Wooded Foothills", // fetch → Forest
+    "Yavimaya, Cradle of Growth", // always a Forest
+    "Castle Garenbrig",           // taps for {G} or {G}{G}
+    "Turntimber Symbiosis",       // land face taps for {G}
   ]);
   let mulligans = 0;
   for (let m = 0; m <= mullLimit; m++) {
@@ -9618,18 +9904,70 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
   }
 
   const openingHand = [...hand];
+  const t1DorkInHand = hand.some(c => getCard(c)?.tags?.includes("dork") && getCard(c)?.cmc === 1);
+
+  // ── Smarter sequencing helpers ────────────────────────────
+  // Should we hold a tutor this turn? Hold if mana after cast < target CMC.
+  function shouldHoldTutor(card, mana) {
+    const TUTOR_MIN = { "Natural Order": 6, "Fierce Empath": 6, "Chord of Calling": 2,
+      "Eldritch Evolution": 2, "Worldly Tutor": 1, "Elvish Harbinger": 1,
+      "Shared Summons": 1, "Archdruid's Charm": 1 };
+    const min = TUTOR_MIN[card];
+    if (!min) return false;
+    const cmc = getCard(card)?.cmc ?? 0;
+    return (mana - cmc) < min;
+  }
+
+  function playCard(card, idx) {
+    hand.splice(idx, 1);
+    const cardType = getCard(card)?.type ?? "";
+    const cardData = getCard(card);
+    if (cardType === "instant" || cardType === "sorcery") {
+      if (card === "Green Sun's Zenith") {
+        library.push(card);
+        for (let i = library.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [library[i], library[j]] = [library[j], library[i]]; }
+      } else {
+        graveyard.push(card);
+      }
+    } else {
+      battlefield.push(card);
+      // Creatures enter with summoning sickness — can't tap for mana this turn
+      if (cardType === "creature") sickSet.add(card);
+      // Fetch lands: immediately crack for a Forest (search + shuffle)
+      if (cardData?.tags?.includes("fetch")) {
+        const fetchIdx = battlefield.lastIndexOf(card);
+        battlefield.splice(fetchIdx, 1);
+        graveyard.push(card);
+        // Find a Forest in library to put onto battlefield (tapped — doesn't produce mana this turn)
+        const forestIdx = library.findIndex(c => getCard(c)?.type === "land" && !getCard(c)?.tags?.includes("fetch"));
+        if (forestIdx >= 0) {
+          const found = library.splice(forestIdx, 1)[0];
+          battlefield.push(found);
+          // Shuffle remaining library
+          for (let i = library.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [library[i], library[j]] = [library[j], library[i]]; }
+          // Fetched land enters tapped — mark it sick so it doesn't produce mana this turn
+          sickSet.add(found);
+        }
+        landPlayed = true; // fetch counts as the land play
+      }
+    }
+  }
 
   // ── Game state ──────────────────────────────────────────────
   let battlefield = [];
   let graveyard   = [];
   let landPlayed  = false;
+  let sickSet     = new Set(); // creatures that entered this turn (have summoning sickness)
   let winTurn     = null;
-  let winCombo    = null; // short label of the winning combo
-  let bottlenecks = []; // missing piece strings from suppressed wins
-  let manaCurve   = []; // mana available per turn
+  let winCombo    = null;
+  let bottlenecks = [];
+  let manaCurve   = [];
+  let t1Dork      = false;
+  let winBattlefield = null;
 
   for (let turn = 1; turn <= MAX_TURNS; turn++) {
     // Untap + draw (skip draw on turn 1 for first player — but for goldfish always draw)
+    sickSet = new Set(); // all permanents untap and lose summoning sickness
     if (turn > 1) {
       if (library.length > 0) { hand.push(library.shift()); }
     }
@@ -9646,23 +9984,59 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
       if (!landPlayed) {
         const landIdx = hand.findIndex(c => getCard(c)?.type === "land");
         if (landIdx >= 0) {
-          const land = hand.splice(landIdx, 1)[0];
-          battlefield.push(land);
-          landPlayed = true;
+          const land = hand[landIdx];
+          if (getCard(land)?.tags?.includes("fetch")) {
+            // Fetch lands: playCard handles cracking and sets landPlayed
+            playCard(land, landIdx);
+          } else {
+            hand.splice(landIdx, 1);
+            battlefield.push(land);
+            landPlayed = true;
+          }
           madePlay = true;
           continue;
         }
       }
 
-      // Calculate available mana
-      const mana = calculateBattlefieldMana(battlefield);
-      if (manaCurve.length < turn) manaCurve.push(mana); // record once per turn
+      // Calculate available mana (excluding summoning-sick creatures), split by color
+      const manaPool = calculateSimManaPool(battlefield, sickSet);
+      const mana = manaPool.total; // total for advisor call
+      if (manaCurve.length < turn) manaCurve.push(mana);
 
-      // Run advisor
+      // Track T1 dork
+      if (turn === 1 && battlefield.some(c => getCard(c)?.tags?.includes("dork"))) t1Dork = true;
+
+      // Smarter sequencing: always try to cast a 1-drop dork T1 before anything else
+      if (turn === 1 && manaPool.green >= 1 && !battlefield.some(c => getCard(c)?.tags?.includes("dork"))) {
+        const odIdx = hand.findIndex(c => getCard(c)?.tags?.includes("dork") && getCard(c)?.cmc === 1);
+        if (odIdx >= 0) { playCard(hand[odIdx], odIdx); t1Dork = true; madePlay = true; continue; }
+      }
+
+      // Pass sick-adjusted battlefield to advisor.
+      // Sick dorks can't tap for mana. Sick creatures with ETB-dependent roles
+      // (recursion, draw, tutor) also can't contribute until next turn.
+      // We hide sick dorks AND sick non-land creatures that entered this turn
+      // but whose value is entirely ETB-based (Eternal Witness, Fierce Empath, etc.).
+      // Quirion/Scryb Ranger and similar activated-ability creatures are kept
+      // because their non-tap abilities work immediately.
+      const ETB_ONLY_TAGS = new Set(["dork","big-dork","etb","recursion","mana-doubler"]);
+      // Build set of all mustPreExist cards across all combos — these require the card to have
+      // been on board before this turn (to tap / activate). A sick mustPreExist card can't loop.
+      const MUST_PRE_EXIST_CARDS = new Set(COMBOS.flatMap(c => c.mustPreExist ?? []));
+      const advisorBattlefield = battlefield.filter(c => {
+        if (!sickSet.has(c)) return true;
+        const data = getCard(c);
+        if (!data) return true;
+        // Remove sick creatures whose contribution is tapping or ETB-only
+        if (data.tags?.some(t => ETB_ONLY_TAGS.has(t))) return false;
+        // Remove sick creatures that are mustPreExist in any combo (they need to tap to loop)
+        if (data.type === "creature" && MUST_PRE_EXIST_CARDS.has(c)) return false;
+        return true;
+      });
       let analysis;
       try {
         analysis = analyzeGameState({
-          hand, battlefield, graveyard,
+          hand, battlefield: advisorBattlefield, graveyard,
           manaAvailable: mana, isMyTurn: true,
           deckList: deckSet,
         });
@@ -9671,11 +10045,45 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
       const liveResults = (analysis.results ?? []).filter(r => !r.isSuppressed);
       const top = liveResults[0];
 
-      // Check for win
+      // Check for win — validate that the win is actually achievable with available mana
       if (top && isWinCategory(top.category)) {
-        winTurn = turn;
-        winCombo = extractComboLabel(top);
-        break;
+        // Find which combo the advisor is relying on for infiniteMana
+        // All pieces must be on board already OR castable with our color-aware mana pool
+        const comboName = analysis.activeComboName ?? null;
+        const activeCombo = comboName ? COMBOS.find(c => c.name === comboName) : null;
+        let winValid = true;
+
+        if (activeCombo) {
+          // Simulate casting required pieces in order to verify green mana suffices
+          let remainingGreen = manaPool.green;
+          let remainingColorless = manaPool.colorless;
+          for (const req of activeCombo.requires) {
+            if (battlefield.includes(req)) continue; // already on board
+            const data = getCard(req);
+            if (!data || data.type === "land") continue;
+            const cmc = data.cmc ?? 0;
+            const pips = data.greenPips ?? Math.min(cmc, data.devotion ?? 0);
+            if (remainingGreen < pips || (remainingGreen + remainingColorless) < cmc) {
+              winValid = false; break;
+            }
+            remainingGreen -= pips;
+            remainingColorless -= Math.max(0, cmc - pips);
+            if (remainingColorless < 0) { remainingGreen += remainingColorless; remainingColorless = 0; }
+          }
+        }
+
+        if (winValid) {
+          const winCard = extractPlayableCard(top, hand, battlefield);
+          if (winCard) {
+            const widx = hand.indexOf(winCard);
+            if (widx >= 0 && simCanCast(winCard, manaPool)) playCard(winCard, widx);
+          }
+          winTurn = turn;
+          winCombo = extractComboLabel(top);
+          winBattlefield = [...battlefield];
+          break;
+        }
+        // Win not actually achievable this turn — fall through and keep playing
       }
 
       // Collect bottleneck data from suppressed wins
@@ -9692,41 +10100,38 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
       if (cardToPlay) {
         const idx = hand.indexOf(cardToPlay);
         const cardData = getCard(cardToPlay);
-        const cmc = cardData?.cmc ?? 0;
         const cardType = cardData?.type ?? "";
-        if (idx >= 0 && cmc <= mana && cardType !== "land") {
-          hand.splice(idx, 1);
-          if (cardType === "instant" || cardType === "sorcery") {
-            if (cardToPlay === "Green Sun's Zenith") {
-              // GSZ shuffles back into library
-              library.push(cardToPlay);
-              for (let i = library.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [library[i], library[j]] = [library[j], library[i]]; }
-            } else {
-              graveyard.push(cardToPlay);
-            }
-          } else {
-            battlefield.push(cardToPlay);
+        const isTutor = cardData?.tags?.includes("tutor");
+        if (idx >= 0 && simCanCast(cardToPlay, manaPool) && cardType !== "land") {
+          // Smarter: hold tutors on early turns if we can't act on the found card
+          const holdIt = isTutor && turn <= 3 && shouldHoldTutor(cardToPlay, mana);
+          if (!holdIt) {
+            playCard(cardToPlay, idx);
+            played = true;
+            madePlay = true;
+            continue;
           }
-          played = true;
-          madePlay = true;
-          continue;
         }
       }
 
-      // Fallback: cast the highest-CMC affordable non-land card in hand
+      // Fallback: cast best affordable card by smarter scoring (dorks > combos > spells; hold tutors)
       if (!played) {
-        const affordable = hand
-          .map((c, i) => ({ c, i, cmc: getCard(c)?.cmc ?? 0, type: getCard(c)?.type ?? "" }))
-          .filter(x => x.type !== "land" && x.cmc <= mana && x.cmc > 0)
-          .sort((a, b) => b.cmc - a.cmc);
+        const affordable = hand.map((c, i) => {
+          const cd = getCard(c);
+          const cmc  = cd?.cmc ?? 0;
+          const type = cd?.type ?? "";
+          const tags = cd?.tags ?? [];
+          if (type === "land" || !simCanCast(c, manaPool) || cmc === 0) return null;
+          let score = cmc;
+          if (tags.includes("dork") && cmc === 1) score += 8;
+          else if (tags.includes("dork"))          score += 5;
+          else if (tags.includes("tutor") && !shouldHoldTutor(c, mana)) score += 4;
+          else if (tags.includes("combo"))         score += 3;
+          else if (tags.includes("tutor"))         score -= 3; // hold if can't act
+          return { c, i, score };
+        }).filter(Boolean).sort((a, b) => b.score - a.score);
         if (affordable.length > 0) {
-          const best = affordable[0];
-          hand.splice(best.i, 1);
-          if (best.type === "instant" || best.type === "sorcery") {
-            graveyard.push(best.c);
-          } else {
-            battlefield.push(best.c);
-          }
+          playCard(affordable[0].c, affordable[0].i);
           madePlay = true;
           continue;
         }
@@ -9739,7 +10144,7 @@ function simulateOneGame(deckCards, deckSet, mullLimit = 2, maxTurns = 20) {
     if (winTurn !== null) break;
   }
 
-  return { openingHand, mulligans, winTurn, winCombo, bottlenecks, manaCurve };
+  return { openingHand, mulligans, winTurn, winCombo, bottlenecks, manaCurve, t1Dork, winBattlefield };
 }
 
 // Derive a short combo label from an advisor result headline
@@ -9787,13 +10192,14 @@ function runNGames(deckCards, n = 50, maxTurns = 20) {
   const t5Rate      = (results.filter(r => r.winTurn !== null && r.winTurn <= 5).length / n * 100);
   const avgMulligans = (results.reduce((a, r) => a + r.mulligans, 0) / n);
 
-  // Bottleneck frequency: count how often each missing-piece phrase appears
+  // T1 dork rate
+  const t1DorkRate = (results.filter(r => r.t1Dork).length / n * 100);
+
+  // Bottleneck frequency
   const bottleneckCounts = {};
   for (const r of results) {
-    // Deduplicate within a single game first
     const seen = new Set();
     for (const b of r.bottlenecks) {
-      // Normalise: strip trailing detail, keep first ~50 chars
       const key = b.slice(0, 55).replace(/\(.*?\)/g, "").trim();
       if (!seen.has(key)) {
         seen.add(key);
@@ -9806,10 +10212,10 @@ function runNGames(deckCards, n = 50, maxTurns = 20) {
     .slice(0, 8)
     .map(([reason, count]) => ({ reason, count, pct: Math.round(count / n * 100) }));
 
-  // Win turn distribution (T1–T10+)
+  // Win turn distribution — full T1–T8+ for bar chart
   const distribution = {};
   for (const t of winTurns) {
-    const key = t <= 10 ? `T${t}` : "T11+";
+    const key = t <= 8 ? `T${t}` : "T9+";
     distribution[key] = (distribution[key] ?? 0) + 1;
   }
 
@@ -9831,15 +10237,108 @@ function runNGames(deckCards, n = 50, maxTurns = 20) {
     manaCurveAvg.push(vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0);
   }
 
+  // ── Cut suggestions ──────────────────────────────────────
+  // Count how often each non-commander card appears in winning vs losing battlefields
+  const cardWinCount  = {};
+  const cardLossCount = {};
+  const deckCardNames = [...new Set(nonCommanderCards)];
+  for (const r of results) {
+    const bf = new Set(r.winBattlefield ?? []);
+    for (const c of deckCardNames) {
+      if (getCard(c)?.type === "land") continue; // skip lands
+      if (r.winTurn !== null) {
+        if (bf.has(c)) cardWinCount[c]  = (cardWinCount[c]  ?? 0) + 1;
+      } else {
+        cardLossCount[c] = (cardLossCount[c] ?? 0) + 1;
+      }
+    }
+  }
+  // Score each card: win appearances / total wins. Low score = often absent from wins = cut candidate
+  const cutCandidates = deckCardNames
+    .filter(c => {
+      const cd = getCard(c);
+      if (!cd || cd.type === "land") return false;
+      const tags = cd.tags ?? [];
+      // Skip obvious auto-includes
+      if (tags.includes("dork") && (cd.cmc ?? 0) <= 1) return false;
+      return true;
+    })
+    .map(c => {
+      const winApps  = cardWinCount[c]  ?? 0;
+      const lossApps = cardLossCount[c] ?? 0;
+      const winPct   = wins.length ? Math.round(winApps  / wins.length  * 100) : 0;
+      const lossPct  = (n - wins.length) ? Math.round(lossApps / (n - wins.length) * 100) : 0;
+      const score    = winPct - lossPct; // negative = appears more in losses than wins
+      return { card: c, winPct, lossPct, score, winApps };
+    })
+    .filter(x => x.winPct < 15) // only cards rarely seen in winning games
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 8);
+
   return {
     n, wins: wins.length, winRate, avgWinTurn, avgMulligans,
-    t3Rate, t4Rate, t5Rate,
+    t3Rate, t4Rate, t5Rate, t1DorkRate,
     topBottlenecks, distribution, winCombos, manaCurveAvg, results, maxTurns,
+    cutCandidates,
   };
 }
 
 // ── Replay Viewer Modal ────────────────────────────────────────────────────────
 // Small card image component for replay view
+// ── HandHoverPopup — shows full opening hand as card images on hover ──────────
+function HandHoverPopup({ hand, anchorRef }) {
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    if (!anchorRef?.current) return;
+    const r = anchorRef.current.getBoundingClientRect();
+    setPos({ x: r.left, y: r.bottom + 6 });
+  }, [anchorRef]);
+  if (!hand?.length) return null;
+  return (
+    <div style={{
+      position: "fixed", left: pos.x, top: pos.y, zIndex: 9999,
+      background: "#0d1a0d", border: `1px solid ${COLORS.borderBright}`,
+      borderRadius: "8px", padding: "8px", boxShadow: "0 6px 28px rgba(0,0,0,0.9)",
+      display: "flex", gap: "4px", flexWrap: "wrap", maxWidth: "360px",
+      pointerEvents: "none",
+    }}>
+      {hand.map((name, i) => <MiniCardImg key={i} name={name} />)}
+    </div>
+  );
+}
+
+function MiniCardImg({ name }) {
+  const url = useScryfallImage(name);
+  return (
+    <div style={{ width: 44, height: 62, borderRadius: "4px", overflow: "hidden",
+      border: `1px solid ${COLORS.border}`, background: "#0a150a", flexShrink: 0 }}
+      title={name}>
+      {url && url !== "error"
+        ? <img src={url} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "7px", color: COLORS.textDim, fontFamily: "'Crimson Text',serif",
+            textAlign: "center", padding: "3px", lineHeight: 1.2 }}>{name}</div>
+      }
+    </div>
+  );
+}
+
+function OpeningHandCell({ hand }) {
+  const [hovered, setHovered] = useState(false);
+  const ref = useRef(null);
+  return (
+    <td style={{ padding: "5px 6px", color: COLORS.textDim, fontSize: "11px", maxWidth: "140px" }}>
+      <span ref={ref}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{ cursor: "help", borderBottom: `1px dotted ${COLORS.textDim}` }}>
+        {(hand||[]).slice(0, 2).join(", ")}{(hand||[]).length > 2 ? ` +${(hand||[]).length - 2}` : ""}
+      </span>
+      {hovered && <HandHoverPopup hand={hand} anchorRef={ref} />}
+    </td>
+  );
+}
+
 function ReplayCard({ name, zone }) {
   const url = useScryfallImage(name);
   const [hovered, setHovered] = useState(false);
@@ -9962,6 +10461,319 @@ function ReplayModal({ game, onClose }) {
 }
 
 
+// ── PlayfieldImageView ─────────────────────────────────────────────────────────
+// Card image playfield view for the goldfish screen.
+// Renders zones (hand, battlefield, graveyard) as actual card images,
+// with tap rotation, counter badges, hover zoom, and click-to-interact.
+
+function PlayfieldCardImg({ card, zone, tapped, counters, onClick, onContextMenu, size = "normal", dimmed = false }) {
+  const url = useScryfallImage(card);
+  const [hovered, setHovered] = useState(false);
+  const isLand = getCard(card)?.type === "land";
+
+  const W = size === "small" ? 60 : size === "hand" ? 86 : 76;
+  const H = Math.round(W * 1.396);
+
+  // The outer div acts as the layout placeholder.
+  // When tapped, it takes up H×W (landscape) space in the flex row.
+  // The inner card div is always W×H (portrait), absolutely centered,
+  // then rotated 90deg — so it fills exactly the H×W placeholder.
+  const glowColor = tapped ? COLORS.gold + "55" : COLORS.green2 + "44";
+  const outerW = tapped ? H : W;
+  const outerH = tapped ? W : H;
+
+  return (
+    <div
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={card}
+      style={{
+        position: "relative",
+        width: outerW,
+        height: outerH,
+        flexShrink: 0,
+        cursor: onClick ? "pointer" : "default",
+        zIndex: hovered ? 10 : 1,
+        transition: "width 0.2s ease, height 0.2s ease",
+      }}
+    >
+      {/* Inner card — always portrait (W×H), centered in outer, rotated when tapped */}
+      <div style={{
+        position: "absolute",
+        width: W, height: H,
+        top: "50%", left: "50%",
+        transform: `translate(-50%, -50%)${tapped ? " rotate(90deg)" : ""}${hovered ? " scale(1.07)" : ""}`,
+        transformOrigin: "center center",
+        transition: "transform 0.2s ease",
+      }}>
+        <div style={{
+          width: "100%", height: "100%",
+          borderRadius: "6px", overflow: "hidden",
+          border: `1px solid ${tapped ? COLORS.gold + "99" : hovered ? COLORS.green2 + "aa" : COLORS.border}`,
+          boxShadow: hovered
+            ? `0 0 14px ${glowColor}, 0 4px 20px rgba(0,0,0,0.8)`
+            : "0 2px 8px rgba(0,0,0,0.5)",
+          opacity: dimmed ? 0.45 : 1,
+          background: "#0d1a0d",
+          transition: "border-color 0.15s, box-shadow 0.15s",
+        }}>
+          {url && url !== "error" ? (
+            <img
+              src={url} alt={card}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }}
+            />
+          ) : url === "error" ? (
+            <div style={{
+              width: "100%", height: "100%",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              padding: "6px", background: "linear-gradient(160deg, #0a1a0a, #162816)",
+            }}>
+              <div style={{ fontSize: isLand ? "18px" : "20px", marginBottom: "4px" }}>{isLand ? "🌲" : "🌿"}</div>
+              <div style={{
+                fontSize: "9px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif",
+                textAlign: "center", lineHeight: 1.2, wordBreak: "break-word",
+              }}>{card}</div>
+            </div>
+          ) : (
+            <div style={{
+              width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+              background: "linear-gradient(160deg, #0a1a0a, #162816)",
+            }}>
+              <div style={{ width: 16, height: 16, border: `2px solid ${COLORS.border}`, borderTopColor: COLORS.green2, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+            </div>
+          )}
+        </div>
+
+        {/* Counter badge — counter-rotated to stay upright */}
+        {counters > 0 && (
+          <div style={{
+            position: "absolute", bottom: 3, right: 3,
+            background: COLORS.gold, color: "#000",
+            borderRadius: "50%", width: 17, height: 17,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "9px", fontWeight: "bold", fontFamily: "'Cinzel', serif",
+            border: "1px solid #000", pointerEvents: "none",
+            transform: tapped ? "rotate(-90deg)" : "none",
+          }}>{counters}</div>
+        )}
+        {/* Transform badge — shown for DFCs on the battlefield */}
+        {zone === "battlefield" && (getCard(card)?.transformsTo || getCard(card)?.transformsFrom) && (
+          <div style={{
+            position: "absolute", top: 3, right: 3,
+            background: "#1a1000", color: COLORS.gold,
+            borderRadius: "4px", padding: "1px 4px",
+            fontSize: "9px", fontFamily: "'Cinzel', serif",
+            border: `1px solid ${COLORS.gold}88`, pointerEvents: "none",
+            transform: tapped ? "rotate(-90deg)" : "none",
+          }}>⟳</div>
+        )}
+      </div>
+
+      {/* Hover zoom — rendered outside the rotating inner div, always upright */}
+      {hovered && url && url !== "error" && (
+        <div style={{
+          position: "absolute",
+          bottom: "calc(100% + 8px)",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 200, height: 279,
+          zIndex: 9999, pointerEvents: "none",
+          borderRadius: "10px", overflow: "hidden",
+          border: `1px solid ${COLORS.borderBright}`,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.9)",
+        }}>
+          <img src={url} alt={card} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function PlayfieldImageView({
+  hand, battlefield, graveyard, exile,
+  tapped, counters, cardKey,
+  onHandClick, onBattlefieldClick, onContextMenu,
+  dragOver, dropZoneProps,
+  getCard, isFetch, landPlayed,
+}) {
+  // Group battlefield cards by type for visual layout
+  const bfLands     = battlefield.map((c, i) => ({ c, i })).filter(({ c }) => getCard(c)?.type === "land");
+  const bfCreatures = battlefield.map((c, i) => ({ c, i })).filter(({ c }) => getCard(c)?.type === "creature");
+  const bfOther     = battlefield.map((c, i) => ({ c, i })).filter(({ c }) => !["land", "creature"].includes(getCard(c)?.type));
+
+  const zoneHeader = (label, count, color) => (
+    <div style={{
+      fontSize: "9px", letterSpacing: "2px", color: color || COLORS.textDim,
+      fontFamily: "'Cinzel', serif", marginBottom: "6px",
+      display: "flex", justifyContent: "space-between", alignItems: "center",
+    }}>
+      <span>{label}</span>
+      <span style={{ color: COLORS.textDim, fontSize: "9px" }}>{count}</span>
+    </div>
+  );
+
+  const CardRow = ({ cards, label, color, isHand = false, isBf = false, isGrave = false }) => (
+    <div style={{ marginBottom: "12px" }}>
+      {label && zoneHeader(label, cards.length, color)}
+      <div
+        {...(isBf ? dropZoneProps("battlefield") : isHand ? dropZoneProps("hand") : {})}
+        style={{
+          display: "flex", flexWrap: "wrap", gap: isHand ? "6px" : "4px",
+          minHeight: isHand ? 124 : 112,
+          padding: "6px",
+          background: "#06100680",
+          borderRadius: "6px",
+          border: (isBf && dragOver === "battlefield") ? `1px dashed ${COLORS.green3}` :
+                  (isHand && dragOver === "hand")       ? `1px dashed ${COLORS.green2}` : "1px solid transparent",
+          transition: "border 0.1s",
+          alignItems: "flex-end",
+        }}
+      >
+        {cards.length === 0
+          ? <span style={{ fontSize: "10px", color: COLORS.textDim, fontStyle: "italic", alignSelf: "center", padding: "4px 8px" }}>Empty</span>
+          : cards.map(({ c, i }) => {
+              const key = cardKey(c, i);
+              const isTapped = isBf && tapped.has(key);
+              const cardCounters = isBf ? (counters[key] ?? 0) : 0;
+              const isGraveCard = isGrave;
+              const cantPlay = isHand && getCard(c)?.type === "land" && landPlayed;
+              return (
+                <PlayfieldCardImg
+                  key={`${c}:${i}`}
+                  card={c}
+                  zone={isBf ? "battlefield" : isHand ? "hand" : "graveyard"}
+                  tapped={isTapped}
+                  counters={cardCounters}
+                  dimmed={isGrave || (isHand && cantPlay)}
+                  size={isHand ? "hand" : "normal"}
+                  onClick={isBf ? () => onBattlefieldClick(c, i) : isHand && !cantPlay ? () => onHandClick(c, i) : undefined}
+                  onContextMenu={e => onContextMenu(c, i, isBf ? "battlefield" : isHand ? "hand" : "graveyard", e)}
+                />
+              );
+            })
+        }
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: "10px 12px" }}>
+      {/* HAND */}
+      <CardRow
+        cards={hand.map((c, i) => ({ c, i }))}
+        label="HAND — click to cast"
+        color={COLORS.green2}
+        isHand
+      />
+
+      {/* BATTLEFIELD */}
+      <div style={{ marginBottom: "12px" }}>
+        {zoneHeader("BATTLEFIELD — click to tap", battlefield.length, COLORS.green3)}
+        <div
+          {...dropZoneProps("battlefield")}
+          style={{
+            background: "#06100680",
+            borderRadius: "8px",
+            border: dragOver === "battlefield" ? `1px dashed ${COLORS.green3}` : `1px solid ${COLORS.border}22`,
+            padding: "6px",
+            minHeight: 120,
+            transition: "border 0.1s",
+          }}
+        >
+          {/* Non-land creatures and spells — top row */}
+          {(bfCreatures.length > 0 || bfOther.length > 0) && (
+            <div style={{ marginBottom: "8px" }}>
+              <div style={{ fontSize: "8px", color: COLORS.green3, letterSpacing: "1.5px", fontFamily: "'Cinzel', serif", marginBottom: "4px", opacity: 0.7 }}>
+                CREATURES / SPELLS
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "flex-end" }}>
+                {[...bfCreatures, ...bfOther].map(({ c, i }) => {
+                  const key = cardKey(c, i);
+                  return (
+                    <PlayfieldCardImg
+                      key={`${c}:${i}`} card={c} zone="battlefield"
+                      tapped={tapped.has(key)} counters={counters[key] ?? 0}
+                      onClick={() => onBattlefieldClick(c, i)}
+                      onContextMenu={e => onContextMenu(c, i, "battlefield", e)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {/* Lands — bottom row */}
+          {bfLands.length > 0 && (
+            <div>
+              <div style={{ fontSize: "8px", color: "#3a7a2a", letterSpacing: "1.5px", fontFamily: "'Cinzel', serif", marginBottom: "4px", opacity: 0.7 }}>
+                LANDS
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "flex-end" }}>
+                {bfLands.map(({ c, i }) => {
+                  const key = cardKey(c, i);
+                  return (
+                    <PlayfieldCardImg
+                      key={`${c}:${i}`} card={c} zone="battlefield"
+                      tapped={tapped.has(key)} counters={counters[key] ?? 0}
+                      onClick={() => onBattlefieldClick(c, i)}
+                      onContextMenu={e => onContextMenu(c, i, "battlefield", e)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {battlefield.length === 0 && (
+            <span style={{ fontSize: "11px", color: COLORS.textDim, fontStyle: "italic", padding: "8px" }}>Empty</span>
+          )}
+        </div>
+      </div>
+
+      {/* GRAVEYARD + EXILE row */}
+      <div style={{ display: "flex", gap: "12px" }}>
+        <div style={{ flex: 1 }}>
+          {zoneHeader("GRAVEYARD", graveyard.length, COLORS.textDim)}
+          <div {...dropZoneProps("graveyard")} style={{
+            display: "flex", flexWrap: "wrap", gap: "4px", minHeight: 56,
+            background: "#06100650", borderRadius: "6px", padding: "6px",
+            border: dragOver === "graveyard" ? `1px dashed ${COLORS.textDim}` : "1px solid transparent",
+          }}>
+            {graveyard.length === 0
+              ? <span style={{ fontSize: "10px", color: COLORS.textDim, fontStyle: "italic" }}>Empty</span>
+              : graveyard.map((c, i) => (
+                  <PlayfieldCardImg key={`${c}:${i}`} card={c} zone="graveyard"
+                    tapped={false} counters={0} dimmed size="small"
+                    onContextMenu={e => onContextMenu(c, i, "graveyard", e)}
+                  />
+                ))
+            }
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          {zoneHeader("EXILE", exile.length, COLORS.textDim)}
+          <div {...dropZoneProps("exile")} style={{
+            display: "flex", flexWrap: "wrap", gap: "4px", minHeight: 56,
+            background: "#06100650", borderRadius: "6px", padding: "6px",
+            border: dragOver === "exile" ? `1px dashed ${COLORS.textDim}` : "1px solid transparent",
+          }}>
+            {exile.length === 0
+              ? <span style={{ fontSize: "10px", color: COLORS.textDim, fontStyle: "italic" }}>Empty</span>
+              : exile.map((c, i) => (
+                  <PlayfieldCardImg key={`${c}:${i}`} card={c} zone="exile"
+                    tapped={false} counters={0} dimmed size="small"
+                    onContextMenu={e => onContextMenu(c, i, "exile", e)}
+                  />
+                ))
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   // ── state ──────────────────────────────────────────────────
   const [phase, setPhase] = useState("setup"); // setup | mulligan | playing | stats
@@ -9991,6 +10803,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   const [landPlayed, setLandPlayed] = useState(false);
   const [log, setLog] = useState([]);
   const [expandedSteps, setExpandedSteps] = useState(new Set());
+  const [gameNotes, setGameNotes] = useState(""); // scratchpad for current game
   const [mulliganCount, setMulliganCount] = useState(0);
   const [contextMenu, setContextMenu] = useState(null);
   const [pendingBottoms, setPendingBottoms] = useState([]);
@@ -9998,6 +10811,9 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   const [yevaTax, setYevaTax] = useState(0);
   const [showTutor, setShowTutor] = useState(false);
   const [tutorQuery, setTutorQuery] = useState("");
+  const [tutorMaxCmc, setTutorMaxCmc] = useState(null); // null = no filter; number = GSZ max X
+  const [tutorOnSelect, setTutorOnSelect] = useState(null); // callback after selection (for GSZ shuffle)
+  const [tutorSelected, setTutorSelected] = useState(0); // keyboard-highlighted index
   const tutorInputRef = useRef(null);
   const [tapped, setTapped] = useState(new Set());
   const [counters, setCounters] = useState({});
@@ -10021,6 +10837,8 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   // ── Drag state ──────────────────────────────────────────────
   const [dragCard, setDragCard] = useState(null); // {card, fromZone, fromIndex}
   const [dragOver, setDragOver] = useState(null); // zone name being hovered
+  // ── View mode ───────────────────────────────────────────────
+  const [viewMode, setViewMode] = useState("list"); // "list" | "image"
   // ── Run N state ─────────────────────────────────────────────
   const [runNCount, setRunNCount] = useState(100);
   const [runNMaxTurns, setRunNMaxTurns] = useState(8);
@@ -10143,6 +10961,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
     replaySnapshotsRef.current = [];
     winComboRef.current = null;
     openingHandRef.current = lib.slice(0, 7);
+    setGameNotes("");
     setPhase("mulligan");
     addLog("Game started — 7-card opening hand drawn.", COLORS.green2);
   }
@@ -10183,6 +11002,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
       winCombo: winComboRef.current,
       turns: turnRef.current,
       replay: finalSnapshots,
+      notes: gameNotes.trim() || null,
     };
     setGameHistory(prev => {
       const next = [...prev, entry];
@@ -10198,10 +11018,9 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
 
   function scoreMulliganHand(cards) {
     const GREEN_LANDS_SET = new Set([
-      "Forest","Dryad Arbor","Misty Rainforest","Verdant Catacombs","Windswept Heath",
-      "Wooded Foothills","Yavimaya, Cradle of Growth","Castle Garenbrig",
-      "Turntimber Symbiosis","Shifting Woodland","Gaea's Cradle","Itlimoc, Cradle of the Sun",
-      "Nykthos, Shrine to Nyx",
+      "Forest",
+      "Misty Rainforest","Verdant Catacombs","Windswept Heath","Wooded Foothills",
+      "Yavimaya, Cradle of Growth","Castle Garenbrig","Turntimber Symbiosis",
     ]);
     return cards.map((c, i) => {
       const tags = getCard(c)?.tags ?? [];
@@ -10312,6 +11131,28 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   // ── NEXT TURN ───────────────────────────────────────────────
   function nextTurn() {
     const next = turnRef.current + 1;
+
+    // Auto-transform Growing Rites of Itlimoc → Itlimoc if ≥4 creatures on battlefield
+    // (trigger fires at end of turn / beginning of end step with ≥4 creatures you control)
+    setBattlefield(prev => {
+      const creaturesNow = prev.filter(c => getCard(c)?.type === "creature").length;
+      if (prev.includes("Growing Rites of Itlimoc") && creaturesNow >= 4) {
+        const idx = prev.indexOf("Growing Rites of Itlimoc");
+        const next = [...prev];
+        next[idx] = "Itlimoc, Cradle of the Sun";
+        addLog("Growing Rites of Itlimoc → Itlimoc, Cradle of the Sun (auto-transformed: ≥4 creatures).", COLORS.gold);
+        // Migrate tap state
+        setTapped(t => {
+          const s = new Set(t);
+          const oldKey = `Growing Rites of Itlimoc:${idx}`;
+          const newKey = `Itlimoc, Cradle of the Sun:${idx}`;
+          if (s.has(oldKey)) { s.delete(oldKey); s.add(newKey); }
+          return s;
+        });
+        return next;
+      }
+      return prev;
+    });
     // Snapshot state at END of current turn (before untap/draw of next)
     replaySnapshotsRef.current.push({
       turn: turnRef.current,
@@ -10426,6 +11267,35 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
     const type = cardData?.type;
     const cmc = cardData?.cmc ?? 0;
     pushUndo();
+
+    // ── Auto-tap: if manaPool < cmc, tap untapped mana sources to cover cost ──
+    if (cmc > 0 && manaPool < cmc) {
+      const needed = cmc - manaPool;
+      // Gather untapped mana producers sorted by output descending (tap bigger sources first)
+      const untappedSources = battlefield
+        .map((c, i) => ({ c, i, key: cardKey(c, i), mana: calculateCardManaForPool(c, battlefield) }))
+        .filter(({ key, mana }) => !tapped.has(key) && mana > 0)
+        .sort((a, b) => b.mana - a.mana);
+      let tapped_ = new Set(tapped);
+      let autoMana = 0;
+      const autoTapped = [];
+      for (const src of untappedSources) {
+        if (autoMana >= needed) break;
+        tapped_.add(src.key);
+        autoMana += src.mana;
+        autoTapped.push(src);
+      }
+      if (autoMana > 0) {
+        setTapped(tapped_);
+        setManaPool(prev => prev + autoMana);
+        if (autoTapped.length === 1) {
+          addLog(`Auto-tapped ${autoTapped[0].c} for ${autoTapped[0].mana} mana.`, COLORS.green1);
+        } else {
+          addLog(`Auto-tapped ${autoTapped.length} sources for ${autoMana} mana.`, COLORS.green1);
+        }
+      }
+    }
+
     // Remove from hand
     setHand(prev => [...prev.slice(0, idx), ...prev.slice(idx + 1)]);
     // Deduct mana cost from pool
@@ -10436,21 +11306,51 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
       setLandPlayed(true);
       addLog(`Played ${card}.`, COLORS.green1);
     } else if (type === "instant" || type === "sorcery") {
-      // GSZ shuffles back into library; Nature's Rhythm exiles itself
+      // GSZ: T1 (manaPool=1 after auto-tap) → auto-find Dryad Arbor; else open tutor modal
       if (card === "Green Sun's Zenith") {
-        setLibrary(prev => {
-          const lib = [...prev, card];
-          // Shuffle in place
-          for (let i = lib.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [lib[i], lib[j]] = [lib[j], lib[i]];
+        // After deducting {1} (cmc=1 for {G}), remaining pool = manaPool - 1 = X
+        // But auto-tap already ran and we haven't deducted yet — use manaPool as total available
+        const gszX = Math.max(0, manaPool - 1); // X = mana available minus the {G}
+        const shuffleGSZBack = () => {
+          setLibrary(prev => {
+            const lib = [...prev, "Green Sun's Zenith"];
+            for (let i = lib.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [lib[i], lib[j]] = [lib[j], lib[i]];
+            }
+            return lib;
+          });
+        };
+        if (gszX === 0) {
+          // T1 with 1 mana: X=0 → auto-tutor Dryad Arbor
+          const arborIdx = library.indexOf("Dryad Arbor");
+          if (arborIdx !== -1) {
+            setLibrary(prev => [...prev.slice(0, arborIdx), ...prev.slice(arborIdx + 1)]);
+            setBattlefield(prev => [...prev, "Dryad Arbor"]);
+            shuffleGSZBack();
+            addLog(`Cast Green Sun's Zenith (X=0) → Dryad Arbor onto battlefield. GSZ shuffled back.`, COLORS.green2);
+          } else {
+            shuffleGSZBack();
+            addLog(`Cast Green Sun's Zenith (X=0) — Dryad Arbor not in library. GSZ shuffled back.`, COLORS.textMid);
           }
-          return lib;
-        });
-        addLog(`Cast ${card} → shuffled back into library.`, COLORS.textMid);
+        } else {
+          // X>0: open tutor modal filtered to creatures with CMC ≤ X, put to battlefield on select
+          setTutorMaxCmc(gszX);
+          setTutorOnSelect(() => (chosen) => {
+            const idx = library.indexOf(chosen);
+            if (idx !== -1) {
+              setLibrary(prev => [...prev.slice(0, idx), ...prev.slice(idx + 1)]);
+              setBattlefield(prev => [...prev, chosen]);
+            }
+            shuffleGSZBack();
+            addLog(`Green Sun's Zenith (X=${gszX}) → ${chosen} onto battlefield. GSZ shuffled back.`, COLORS.green2);
+          });
+          setShowTutor(true); setTutorQuery("");
+          setTimeout(() => tutorInputRef.current?.focus(), 50);
+        }
       } else if (card === "Nature's Rhythm") {
         setExile(prev => [...prev, card]);
-        addLog(`Cast ${card} → exile (can be cast again once).`, COLORS.textMid);
+        addLog(`Cast ${card} → exile (Harmonize available from graveyard).`, COLORS.textMid);
       } else {
         setGraveyard(prev => [...prev, card]);
         addLog(`Cast ${card} → graveyard.`, COLORS.textMid);
@@ -10468,6 +11368,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
 
   // ── YEVA ────────────────────────────────────────────────────
   function castYeva() {
+    pushUndo();
     const inHand = hand.includes("Yeva, Nature's Herald");
     if (inHand) setHand(prev => { const i = prev.indexOf("Yeva, Nature's Herald"); return [...prev.slice(0,i), ...prev.slice(i+1)]; });
     setBattlefield(prev => { const without = prev.filter(c => c !== "Yeva, Nature's Herald"); return [...without, "Yeva, Nature's Herald"]; });
@@ -10502,14 +11403,20 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   }
 
   // ── TUTOR ───────────────────────────────────────────────────
-  function openTutor() { setShowTutor(true); setTutorQuery(""); setTimeout(() => tutorInputRef.current?.focus(), 50); }
+  function openTutor() { setShowTutor(true); setTutorQuery(""); setTutorMaxCmc(null); setTutorOnSelect(null); setTutorSelected(0); setTimeout(() => tutorInputRef.current?.focus(), 50); }
 
   function tutorCard(card) {
+    if (tutorOnSelect) {
+      // GSZ mode: callback handles where the card goes
+      tutorOnSelect(card);
+      setShowTutor(false); setTutorQuery(""); setTutorMaxCmc(null); setTutorOnSelect(null); setTutorSelected(0);
+      return;
+    }
     const idx = library.indexOf(card);
     if (idx === -1) { addLog(`${card} not found in library.`, COLORS.red); return; }
     setLibrary(prev => [...prev.slice(0, idx), ...prev.slice(idx + 1)]);
     setHand(prev => [...prev, card]);
-    setShowTutor(false); setTutorQuery("");
+    setShowTutor(false); setTutorQuery(""); setTutorMaxCmc(null); setTutorOnSelect(null); setTutorSelected(0);
     addLog(`Tutored: ${card} → hand. Library shuffled.`, COLORS.purple);
   }
 
@@ -10578,6 +11485,38 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
     setContextMenu({ card, index, zone, x: e.clientX, y: e.clientY });
   }
   function closeContextMenu() { setContextMenu(null); }
+
+  // ── TRANSFORM CARD ───────────────────────────────────────────
+  // Swaps a DFC between its two faces in-place, preserving tap/counter state.
+  function transformCard(card, index) {
+    const data = getCard(card);
+    const targetName = data?.transformsTo ?? data?.transformsFrom;
+    if (!targetName) return;
+    pushUndo();
+    setBattlefield(prev => {
+      const next = [...prev];
+      next[index] = targetName;
+      return next;
+    });
+    // Migrate tap/counter state from old key to new key
+    const oldKey = cardKey(card, index);
+    const newKey = cardKey(targetName, index);
+    setTapped(prev => {
+      const next = new Set(prev);
+      if (next.has(oldKey)) { next.delete(oldKey); next.add(newKey); }
+      return next;
+    });
+    setCounters(prev => {
+      if (!(oldKey in prev)) return prev;
+      const next = { ...prev };
+      next[newKey] = next[oldKey];
+      delete next[oldKey];
+      return next;
+    });
+    const dir = data?.transformsTo ? "→" : "↩";
+    addLog(`${card} ${dir} ${targetName} (transformed).`, COLORS.gold);
+    closeContextMenu();
+  }
 
   function moveCard(card, fromZone, toZone, fromIndex) {
     const removeFn = (setter, arr) => setter(prev => {
@@ -10674,20 +11613,29 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   function gradeHand(cards, advisorAnalysis) {
     const dorks  = cards.filter(c => getCard(c)?.tags?.includes("dork")).length;
     const lands  = cards.filter(c => getCard(c)?.type === "land").length;
+    // Cradle/Itlimoc produce 0 mana T1 with no creatures — exclude from "real" land count for T1 planning
+    const realLands = cards.filter(c => {
+      if (getCard(c)?.type !== "land") return false;
+      if (c === "Gaea's Cradle" || c === "Itlimoc, Cradle of the Sun") return false;
+      return true;
+    }).length;
     const tutors = cards.filter(c => getCard(c)?.tags?.includes("tutor")).length;
     const combo  = cards.filter(c => getCard(c)?.tags?.some(t =>
       ["ashaya","duskwatch","quirion","earthcraft","wirewood"].includes(t))).length;
-    const canMakeT1Mana = lands >= 1 || dorks >= 2;
+    const hasCradleOnly = lands > 0 && realLands === 0; // only "lands" are Cradle(s)
+    const canMakeT1Mana = realLands >= 1 || dorks >= 2;
     let notes = [];
 
     // Rule 1: dork + tutor = keep (core game plan)
     if (dorks >= 1 && tutors >= 1) {
       if (canMakeT1Mana) {
         notes.push(`${dorks} dork${dorks > 1 ? "s" : ""} + ${tutors} tutor${tutors > 1 ? "s" : ""} ✓✓ — core game plan`);
-        if (lands === 0) notes.push("0 lands — dork must stick T1");
+        if (realLands === 0 && lands === 0) notes.push("0 lands — dork must stick T1");
+        if (hasCradleOnly) notes.push("⚠️ Gaea's Cradle only — no T1 mana without a dork first");
         if (combo >= 1) notes.push(`${combo} combo piece${combo > 1 ? "s" : ""} in hand`);
         return enrichWithAnalysis({ grade: { label: "KEEP", color: COLORS.green2 }, notes }, advisorAnalysis);
       } else {
+        if (hasCradleOnly) notes.push("⚠️ Gaea's Cradle is your only land — produces 0 mana T1 with no creatures");
         notes.push("dork + tutor but no mana to cast them ✗");
         return enrichWithAnalysis({ grade: { label: "MULLIGAN", color: COLORS.red }, notes }, advisorAnalysis);
       }
@@ -10706,11 +11654,12 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
 
     // Remaining: dork(s) but no tutor
     let score = 0;
-    if (lands >= 2 && lands <= 4)      { score += 2; notes.push(`${lands} lands ✓`); }
-    else if (lands === 1 && dorks >= 2) { score += 2; notes.push("1 land + 2+ dorks ✓"); }
-    else if (lands === 1)               { score += 0; notes.push("1 land, 1 dork — tight"); }
-    else if (lands === 0)               { score -= 2; notes.push("no lands ✗"); }
-    else                                { score += 1; notes.push(`${lands} lands (mana-heavy)`); }
+    if (realLands >= 2 && realLands <= 4)      { score += 2; notes.push(`${realLands} lands ✓`); }
+    else if (realLands === 1 && dorks >= 2)     { score += 2; notes.push("1 land + 2+ dorks ✓"); }
+    else if (realLands === 1)                   { score += 0; notes.push("1 land, 1 dork — tight"); }
+    else if (realLands === 0 && hasCradleOnly)  { score -= 2; notes.push("⚠️ Cradle only — no T1 mana without creatures"); }
+    else if (realLands === 0)                   { score -= 2; notes.push("no lands ✗"); }
+    else                                        { score += 1; notes.push(`${realLands} lands (mana-heavy)`); }
 
     if (dorks >= 2) { score += 3; notes.push(`${dorks} dorks ✓✓`); }
     else            { score += 1; notes.push("1 dork, no tutor — slow"); }
@@ -10810,6 +11759,9 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
             )}
             {isLand && zone === "hand" && <span style={{ fontSize: "9px", color: COLORS.textDim }}>🌲</span>}
             {fetch && <span style={{ fontSize: "9px", color: COLORS.blue }}>⚓</span>}
+            {(getCard(card)?.transformsTo || getCard(card)?.transformsFrom) && zone === "battlefield" && (
+              <span style={{ fontSize: "9px", color: COLORS.gold }}>⟳</span>
+            )}
             {hovered && <CardTooltip name={card} anchorRect={rect} />}
           </span>
         )}
@@ -10884,6 +11836,14 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
             <button onClick={(e) => { e.stopPropagation(); adjustCounter(card, index, +1); }} style={{ ...btnStyle(COLORS.green1), padding: "1px 7px", fontSize: "12px" }}>+</button>
           </div>
         )}
+        {/* Transform (DFC) */}
+        {isBF && (getCard(card)?.transformsTo || getCard(card)?.transformsFrom) && (
+          <div onClick={() => transformCard(card, index)} style={{ padding: "6px 14px", cursor: "pointer", color: COLORS.gold, letterSpacing: "1px" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#1a1a0a"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+            ⟳ Transform → {getCard(card)?.transformsTo ?? getCard(card)?.transformsFrom}
+          </div>
+        )}
         {/* Fetch crack */}
         {canFetch && (
           <div onClick={() => crackFetch(card, zone)} style={{ padding: "6px 14px", cursor: "pointer", color: COLORS.gold, letterSpacing: "1px" }}
@@ -10919,7 +11879,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
       if (e.key === "m" || e.key === "M") { e.preventDefault(); tapAllMana(); }
       if (e.key === "Escape") {
         const anyOpen = showUntapModal || showTutor || showScry || contextMenu;
-        if (anyOpen) { e.stopPropagation(); setShowUntapModal(null); setShowTutor(false); setShowScry(false); setContextMenu(null); }
+        if (anyOpen) { e.stopPropagation(); setShowUntapModal(null); setShowTutor(false); setTutorQuery(""); setTutorMaxCmc(null); setTutorOnSelect(null); setTutorSelected(0); setShowScry(false); setContextMenu(null); }
       }
     };
     window.addEventListener("keydown", handler);
@@ -11014,48 +11974,85 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
   // ── Tutor overlay ─────────────────────────────────────────────
   const TutorOverlay = () => {
     if (!showTutor) return null;
+    const isGSZ = tutorMaxCmc !== null;
     const q = tutorQuery.toLowerCase();
+
+    // GSZ mode: show affordable creatures sorted by CMC desc as default suggestions
+    const gszSuggestions = isGSZ ? [...new Set(library)].filter(c => {
+      const data = getCard(c);
+      return data?.type === "creature" && (data?.cmc ?? 99) <= tutorMaxCmc;
+    }).sort((a, b) => (getCard(b)?.cmc ?? 0) - (getCard(a)?.cmc ?? 0)).slice(0, 12) : [];
+
     const matches = q.length >= 1 ? [...new Set(library)].filter(c => {
       const data = getCard(c);
-      return c.toLowerCase().includes(q)
+      const passesType = isGSZ ? data?.type === "creature" : true;
+      const passesCmc  = isGSZ ? (data?.cmc ?? 99) <= tutorMaxCmc : true;
+      return passesType && passesCmc && (
+        c.toLowerCase().includes(q)
         || (data?.type ?? "").toLowerCase().includes(q)
         || (data?.tags ?? []).some(t => t.toLowerCase().includes(q))
-        || (data?.role ?? "").toLowerCase().includes(q);
-    }).slice(0, 15) : [];
+        || (data?.role ?? "").toLowerCase().includes(q)
+      );
+    }).slice(0, 15) : (isGSZ ? gszSuggestions : []);
+
+    const displayList = matches;
+    const borderColor = isGSZ ? COLORS.green2 : COLORS.purple;
     return (
       <div style={{
-        position: "absolute", left: 0, top: 0, zIndex: 500,
-        background: "#0d1f0d", border: `1px solid ${COLORS.purple}`,
+        position: "fixed", left: "50%", top: "12px", transform: "translateX(-50%)",
+        zIndex: 1500, width: "min(420px, 90vw)", maxHeight: "80vh", overflowY: "auto",
+        background: "#0d1f0d", border: `1px solid ${borderColor}`,
         borderRadius: "8px", padding: "12px", boxShadow: "0 4px 24px rgba(0,0,0,0.9)",
-        margin: "8px", width: "calc(100% - 16px)",
       }}>
-        <div style={{ fontSize: "10px", color: COLORS.purple, letterSpacing: "2px", fontFamily: "'Cinzel', serif", marginBottom: "8px" }}>
-          TUTOR — SEARCH LIBRARY ({library.length} cards)
+        <div style={{ fontSize: "10px", color: borderColor, letterSpacing: "2px", fontFamily: "'Cinzel', serif", marginBottom: "6px" }}>
+          {isGSZ
+            ? `GREEN SUN'S ZENITH — X=${tutorMaxCmc} — CREATURES CMC ≤ ${tutorMaxCmc}`
+            : `TUTOR — SEARCH LIBRARY (${library.length} cards)`}
         </div>
-        <input ref={tutorInputRef} value={tutorQuery} onChange={e => setTutorQuery(e.target.value)}
-          onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); setShowTutor(false); setTutorQuery(""); } if (e.key === "Enter" && matches.length === 1) tutorCard(matches[0]); }}
-          placeholder="Type card name..." style={{
+        {isGSZ && gszSuggestions.length > 0 && q.length === 0 && (
+          <div style={{ fontSize: "9px", color: COLORS.textDim, fontFamily: "'Cinzel', serif", marginBottom: "6px", letterSpacing: "1px" }}>
+            AFFORDABLE TARGETS
+          </div>
+        )}
+        <input ref={tutorInputRef} value={tutorQuery}
+          onChange={e => { setTutorQuery(e.target.value); setTutorSelected(0); }}
+          onKeyDown={e => {
+            if (e.key === "Escape") { e.stopPropagation(); setShowTutor(false); setTutorQuery(""); setTutorMaxCmc(null); setTutorOnSelect(null); setTutorSelected(0); }
+            if (e.key === "ArrowDown") { e.preventDefault(); setTutorSelected(i => Math.min(i + 1, displayList.length - 1)); }
+            if (e.key === "ArrowUp")   { e.preventDefault(); setTutorSelected(i => Math.max(i - 1, 0)); }
+            if (e.key === "Enter" && displayList.length > 0) tutorCard(displayList[tutorSelected]);
+          }}
+          placeholder={isGSZ ? `Search creatures (CMC ≤ ${tutorMaxCmc})...` : "Type card name..."} style={{
             width: "100%", background: "#0a150a", border: `1px solid ${COLORS.border}`,
             borderRadius: "6px", padding: "6px 10px", color: COLORS.text,
             fontFamily: "'Crimson Text', serif", fontSize: "13px", outline: "none", marginBottom: "8px",
           }} />
-        {matches.length === 0 && tutorQuery.length >= 1 && <div style={{ fontSize: "11px", color: COLORS.textDim, fontStyle: "italic", fontFamily: "'Crimson Text', serif" }}>No matches in library.</div>}
-        {matches.map((card, i) => (
-          <div key={i} onClick={() => tutorCard(card)} style={{ padding: "6px 10px", cursor: "pointer", borderRadius: "4px", fontSize: "12px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", marginBottom: "2px" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#1a3a1a"; e.currentTarget.style.color = COLORS.green2; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = COLORS.textMid; }}>
+        {displayList.length === 0 && (q.length >= 1 || isGSZ) && (
+          <div style={{ fontSize: "11px", color: COLORS.textDim, fontStyle: "italic", fontFamily: "'Crimson Text', serif" }}>
+            {isGSZ ? `No creatures with CMC ≤ ${tutorMaxCmc} in library.` : "No matches in library."}
+          </div>
+        )}
+        {displayList.map((card, i) => (
+          <div key={i} onClick={() => tutorCard(card)} onMouseEnter={() => setTutorSelected(i)}
+            style={{ padding: "6px 10px", cursor: "pointer", borderRadius: "4px", fontSize: "12px",
+              fontFamily: "'Crimson Text', serif", marginBottom: "2px",
+              background: i === tutorSelected ? "#1a3a1a" : "transparent",
+              color: i === tutorSelected ? COLORS.green2 : COLORS.textMid,
+            }}>
             {card}
             {getCard(card) && (
               <span style={{ fontSize: "10px", color: COLORS.textDim, marginLeft: "8px" }}>
-                {getCard(card).type}
-                {getCard(card).tags?.includes("dork") ? " · dork" : ""}
-                {getCard(card).tags?.includes("tutor") ? " · tutor" : ""}
-                {getCard(card).tags?.includes("combo") ? " · combo" : ""}
+                {isGSZ ? `CMC ${getCard(card).cmc ?? "?"}` : getCard(card).type}
+                {!isGSZ && getCard(card).tags?.includes("dork") ? " · dork" : ""}
+                {!isGSZ && getCard(card).tags?.includes("tutor") ? " · tutor" : ""}
+                {!isGSZ && getCard(card).tags?.includes("combo") ? " · combo" : ""}
+                {isGSZ && getCard(card).tags?.includes("dork") ? " · dork" : ""}
+                {isGSZ && getCard(card).role ? ` · ${getCard(card).role}` : ""}
               </span>
             )}
           </div>
         ))}
-        <button onClick={() => { setShowTutor(false); setTutorQuery(""); }} style={{
+        <button onClick={() => { setShowTutor(false); setTutorQuery(""); setTutorMaxCmc(null); setTutorOnSelect(null); setTutorSelected(0); }} style={{
           marginTop: "8px", background: "none", border: `1px solid ${COLORS.border}`,
           borderRadius: "6px", padding: "4px 12px", color: COLORS.textDim, cursor: "pointer",
           fontFamily: "'Cinzel', serif", fontSize: "10px", letterSpacing: "1px", width: "100%",
@@ -11385,7 +12382,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
 
             {/* LEFT: zones */}
             <div style={{
-              width: isMobile ? "100%" : "330px", flexShrink: 0, borderRight: isMobile ? "none" : `1px solid ${COLORS.border}`,
+              width: isMobile ? "100%" : viewMode === "image" ? "460px" : "330px", flexShrink: 0, borderRight: isMobile ? "none" : `1px solid ${COLORS.border}`,
               display: isMobile && mobileTab !== "zones" ? "none" : "flex",
               flexDirection: "column", overflow: "hidden",
               position: "relative",
@@ -11402,6 +12399,11 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                 <button onClick={openTutor} style={btnStyle(COLORS.purple)} title="Search your library by card name, type, or tag — e.g. type 'dork' to find mana creatures (T)">🔍 TUTOR</button>
                 <button onClick={() => openScry(3)} style={btnStyle(COLORS.blue)} title="Look at the top 3 cards of your library. Choose which to keep on top and which to send to the bottom.">👁 SCRY 3</button>
                 <button onClick={() => openScry(1)} style={btnStyle(COLORS.border)} title="Look at the top card of your library and keep or bottom it.">👁 1</button>
+                <button
+                  onClick={() => setViewMode(v => v === "list" ? "image" : "list")}
+                  title={viewMode === "list" ? "Switch to card image playfield view" : "Switch to text list view"}
+                  style={{ ...btnStyle(COLORS.green2), background: "#0a2a0a" }}
+                >{viewMode === "list" ? "🃏 IMAGE" : "📋 LIST"}</button>
                 <button onClick={castYeva}
                   disabled={battlefield.includes("Yeva, Nature's Herald")}
                   title={`Cast Yeva from command zone (${4 + yevaTax} mana)`}
@@ -11414,9 +12416,15 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
 
               {/* Land drop indicator + mana pool */}
               <div style={{ padding: "5px 12px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", gap: "8px", alignItems: "center" }}>
-                <span style={{ fontSize: "10px", color: landPlayed ? COLORS.textDim : COLORS.green1, fontFamily: "'Cinzel', serif", letterSpacing: "1px" }}>
-                  {landPlayed ? "🟫 LAND PLAYED" : "🟩 LAND AVAILABLE"}
-                </span>
+                {(() => {
+                  const hasLandInHand = hand.some(c => getCard(c)?.type === "land");
+                  const landAvailColor = landPlayed ? COLORS.textDim : hasLandInHand ? COLORS.green1 : "#3a5a2a";
+                  return (
+                    <span style={{ fontSize: "10px", color: landAvailColor, fontFamily: "'Cinzel', serif", letterSpacing: "1px", opacity: (!landPlayed && !hasLandInHand) ? 0.45 : 1 }}>
+                      {landPlayed ? "🟫 LAND PLAYED" : "🟩 LAND AVAILABLE"}
+                    </span>
+                  );
+                })()}
                 {landPlayed && (
                   <button onClick={() => setLandPlayed(false)} style={{ ...btnStyle(COLORS.border), padding: "1px 7px", fontSize: "9px" }}>reset</button>
                 )}
@@ -11435,7 +12443,33 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
               {ScryModal()}
               {UntapModal()}
 
-              <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}>
+              <div style={{ flex: 1, overflowY: "auto", padding: viewMode === "image" ? "0" : "12px 14px" }}>
+                {viewMode === "image" ? (
+                  <PlayfieldImageView
+                    hand={hand}
+                    battlefield={battlefield}
+                    graveyard={graveyard}
+                    exile={exile}
+                    tapped={tapped}
+                    counters={counters}
+                    cardKey={cardKey}
+                    onHandClick={(card, i) => {
+                      const isLand = getCard(card)?.type === "land";
+                      if (isLand && landPlayed) return;
+                      castFromHand(card, i);
+                    }}
+                    onBattlefieldClick={(c, i) => {
+                      if (isFetch(c)) { crackFetch(c, "battlefield"); }
+                      else { toggleTap(c, i); }
+                    }}
+                    onContextMenu={openContextMenu}
+                    dragOver={dragOver}
+                    dropZoneProps={dropZoneProps}
+                    getCard={getCard}
+                    isFetch={isFetch}
+                    landPlayed={landPlayed}
+                  />
+                ) : (<>
                 {/* Gamestate breadcrumb */}
                 {(() => {
                   const elves = battlefield.filter(c => getCard(c)?.tags?.includes("elf")).length;
@@ -11560,6 +12594,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                     {library.length > 3 && <span style={{ fontSize: "10px", color: COLORS.textDim, marginLeft: "4px" }}>+{library.length - 3} more</span>}
                   </div>
                 </div>
+                </>)} {/* end viewMode === "list" */}
               </div>
             </div>
             {/* MIDDLE: advisor */}
@@ -11643,6 +12678,17 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                   <div style={{ fontSize: "11px", color: COLORS.textDim, fontStyle: "italic" }}>No actions yet.</div>
                 )}
               </div>
+              {/* Game notes scratchpad */}
+              <div style={{ borderTop: `1px solid ${COLORS.border}`, padding: "8px 10px", flexShrink: 0 }}>
+                <div style={{ fontSize: "9px", color: COLORS.textDim, fontFamily: "'Cinzel', serif", letterSpacing: "1.5px", marginBottom: "4px" }}>NOTES</div>
+                <textarea
+                  value={gameNotes}
+                  onChange={e => setGameNotes(e.target.value)}
+                  placeholder="Annotate this game… (saved with replay)"
+                  rows={3}
+                  style={{ width: "100%", background: "#070f07", border: `1px solid ${COLORS.border}`, borderRadius: "4px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", fontSize: "11px", padding: "5px 8px", outline: "none", resize: "none", boxSizing: "border-box", lineHeight: 1.5 }}
+                />
+              </div>
             </div>
             </div> {/* end row wrapper */}
           </div>
@@ -11678,6 +12724,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                 {statBox("AVG ∞ MANA",   avg(g => g.infiniteMana),  "#c084fc")}
                 {statBox("AVG 1ST DORK", avg(g => g.firstDork),     COLORS.green2)}
                 {statBox("AVG MULLS",    avg(g => g.mulligans),      COLORS.gold)}
+                {statBox("T1 DORK",      pct(g => g.firstDork === 1), COLORS.green2)}
                 {statBox("WIN ≤T4",      pct(g => g.winCondition !== null && g.winCondition <= 4), COLORS.red)}
                 {statBox("WIN ≤T5",      pct(g => g.winCondition !== null && g.winCondition <= 5), COLORS.red)}
                 <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
@@ -11707,7 +12754,7 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                   <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Crimson Text', serif", fontSize: "12px" }}>
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${COLORS.border}` }}>
-                        {["#","Mulls","Opening Hand","Dork","∞","Win T","Combo",""].map(h => (
+                        {["#","Mulls","Opening Hand","Dork","∞","Win T","Combo","Notes",""].map(h => (
                           <th key={h} style={{ padding: "5px 6px", color: COLORS.textDim, fontFamily: "'Cinzel', serif", fontSize: "9px", letterSpacing: "1px", textAlign: "left", fontWeight: "normal" }}>{h}</th>
                         ))}
                       </tr>
@@ -11717,16 +12764,19 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                         <tr key={g.gameNum} style={{ borderBottom: `1px solid ${COLORS.border}22`, background: idx % 2 === 0 ? "transparent" : "#0a150a" }}>
                           <td style={{ padding: "5px 6px", color: COLORS.textDim }}>{g.gameNum}</td>
                           <td style={{ padding: "5px 6px", color: g.mulligans > 0 ? COLORS.gold : COLORS.textMid }}>{g.mulligans === 0 ? "—" : `${g.mulligans}×`}</td>
-                          <td style={{ padding: "5px 6px", color: COLORS.textDim, fontSize: "11px", maxWidth: "140px" }}>
-                            <span title={g.openingHand?.join(", ")} style={{ cursor: "default" }}>
-                              {(g.openingHand||[]).slice(0, 2).join(", ")}{(g.openingHand||[]).length > 2 ? ` +${(g.openingHand||[]).length - 2}` : ""}
-                            </span>
-                          </td>
+                          <OpeningHandCell hand={g.openingHand} />
                           <td style={{ padding: "5px 6px", color: g.firstDork ? COLORS.green2 : COLORS.textDim }}>{g.firstDork ? `T${g.firstDork}` : "—"}</td>
                           <td style={{ padding: "5px 6px", color: g.infiniteMana ? "#c084fc" : COLORS.textDim }}>{g.infiniteMana ? `T${g.infiniteMana}` : "—"}</td>
                           <td style={{ padding: "5px 6px", color: g.winCondition ? COLORS.red : COLORS.textDim, fontWeight: g.winCondition ? "bold" : "normal" }}>{g.winCondition ? `T${g.winCondition}` : "—"}</td>
                           <td style={{ padding: "5px 6px", color: COLORS.textMid, fontSize: "10px", fontFamily: "'Cinzel', serif", letterSpacing: "0.5px", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={g.winCombo}>
                             {g.winCombo || "—"}
+                          </td>
+                          <td style={{ padding: "5px 6px", maxWidth: "120px" }} title={g.notes || ""}>
+                            {g.notes ? (
+                              <span style={{ fontSize: "10px", color: COLORS.textDim, fontFamily: "'Crimson Text', serif", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                💬 {g.notes}
+                              </span>
+                            ) : null}
                           </td>
                           <td style={{ padding: "5px 6px" }}>
                             {g.replay?.length > 0 && (
@@ -11820,6 +12870,35 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                       }}
                     >{runNRunning ? `⏳ Running ${runNCount} games…` : `▶ RUN ${runNCount} GAMES`}</button>
                     {!hasDeck && <div style={{ fontSize: "10px", color: COLORS.red, marginTop: "6px", fontFamily: "'Crimson Text', serif" }}>Load a deck first.</div>}
+                    {nr && !runNRunning && (
+                      <button
+                        onClick={() => {
+                          const wins = nr.results.filter(r => r.winTurn !== null);
+                          const rows = [
+                            ["Game","Win Turn","Mulligans","Combo","Card 1","Card 2","Card 3","Card 4","Card 5","Card 6","Card 7"].join(","),
+                            ...wins.map((r, i) => [
+                              i + 1,
+                              r.winTurn,
+                              r.mulligans,
+                              `"${(r.winCombo||"Unknown").replace(/"/g,'""')}"`,
+                              ...(r.openingHand||[]).map(c => `"${c.replace(/"/g,'""')}"`)
+                            ].join(","))
+                          ].join("\n");
+                          const blob = new Blob([rows], { type: "text/csv" });
+                          const a = document.createElement("a");
+                          a.href = URL.createObjectURL(blob);
+                          a.download = `yeva-winning-hands-${nr.n}games.csv`;
+                          a.click();
+                        }}
+                        style={{
+                          width: "100%", marginTop: "6px", background: "none",
+                          border: `1px solid ${COLORS.green1}`,
+                          borderRadius: "8px", padding: "7px",
+                          color: COLORS.green1, cursor: "pointer",
+                          fontFamily: "'Cinzel', serif", fontSize: "10px", letterSpacing: "1px",
+                        }}
+                      >⬇ EXPORT WINNING HANDS CSV ({nr.results.filter(r => r.winTurn !== null).length} wins)</button>
+                    )}
                   </div>
 
                   {/* Run N results */}
@@ -11853,8 +12932,8 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                           </div>
                         </Tip>
                       );
-                      // Build distribution bar
-                      const distKeys = ["T3","T4","T5","T6","T7","T8+"];
+                      // Build distribution bar — full T1–T8+
+                      const distKeys = ["T1","T2","T3","T4","T5","T6","T7","T8+"];
                       const distCounts = distKeys.map(k => {
                         if (k === "T8+") {
                           return Object.entries(nr.distribution).filter(([key]) => parseInt(key.slice(1)) >= 8).reduce((s,[,v]) => s+v, 0);
@@ -11877,6 +12956,8 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                               "Average number of mulligans taken per game. The simulator keeps a hand if it has a dork + tutor (with a mana source), or 2+ dorks + a land. All other hands are mulliganed up to the configured limit.")}
                             {simStatBox("WIN ≤T5", `${nr.t5Rate.toFixed(0)}%`, nr.t5Rate >= 60 ? COLORS.green2 : COLORS.gold, null,
                               "Percentage of all games (including non-wins) where a win line was detected by end of turn 5. This is the key cEDH metric — your goal is to threaten a win before opponents can set up interaction.")}
+                            {simStatBox("T1 DORK RATE", `${(nr.t1DorkRate ?? 0).toFixed(0)}%`, (nr.t1DorkRate ?? 0) >= 65 ? COLORS.green2 : (nr.t1DorkRate ?? 0) >= 40 ? COLORS.gold : COLORS.red, null,
+                              "Percentage of games where a 1-CMC mana dork hit the battlefield on turn 1. This is the single most predictive metric for this deck — a T1 dork accelerates every subsequent turn and dramatically improves win probability.")}
                           </div>
                           {/* T3/T4/T5 breakdown */}
                           <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
@@ -11901,8 +12982,9 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                             {distKeys.map((k, i) => {
                               const count = distCounts[i];
                               const h = count > 0 ? Math.max(4, Math.round(count / maxCount * 48)) : 2;
-                              const isGood = i <= 1; // T3/T4
-                              const col = count === 0 ? COLORS.border : isGood ? COLORS.green2 : i <= 2 ? COLORS.gold : COLORS.textDim;
+                              const isExcept = i <= 1; // T1/T2 — exceptional
+                              const isGood   = i <= 3; // T3/T4 — good
+                              const col = count === 0 ? COLORS.border : isExcept ? "#7c3aed" : isGood ? COLORS.green2 : i <= 4 ? COLORS.gold : COLORS.textDim;
                               return (
                                 <div key={k} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
                                   <div style={{ fontSize: "8px", color: col, fontFamily: "'Cinzel', serif" }}>{count > 0 ? count : ""}</div>
@@ -11956,6 +13038,27 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                             </div>
                           )}
 
+                          {/* Cut Suggestions */}
+                          {nr.cutCandidates?.length > 0 && (
+                            <div style={{ marginTop: "10px" }}>
+                              <Tip id="cut-header" text="Cards that rarely appear on the battlefield in winning games. Low win-presence doesn't automatically mean cut — consider whether the card enables wins indirectly (e.g. tutors that find other pieces). But cards with 0% win presence and high loss presence are strong cut candidates.">
+                                <div style={{ fontFamily: "'Cinzel', serif", fontSize: "9px", color: COLORS.gold, letterSpacing: "1px", marginBottom: "6px", cursor: "help", display: "inline-block" }}>
+                                  ✂ POTENTIAL CUTS (?)
+                                </div>
+                              </Tip>
+                              {nr.cutCandidates.map((c, i) => (
+                                <div key={i} style={{ marginBottom: "5px" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "2px" }}>
+                                    <span style={{ fontSize: "10px", color: COLORS.textMid, fontFamily: "'Crimson Text', serif", flex: 1 }}>{c.card}</span>
+                                    <span style={{ fontSize: "9px", color: c.winPct === 0 ? COLORS.red : COLORS.gold, fontFamily: "'Cinzel', serif", marginLeft: "6px", flexShrink: 0 }}>{c.winPct}% wins</span>
+                                  </div>
+                                  <div style={{ height: "2px", background: COLORS.border, borderRadius: "1px", overflow: "hidden" }}>
+                                    <div style={{ height: "100%", width: `${c.winPct}%`, background: c.winPct === 0 ? COLORS.red : COLORS.gold, borderRadius: "1px", opacity: 0.6 }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           {/* Mana curve */}
                           {nr.manaCurveAvg?.length > 0 && (
                             <div style={{ marginTop: "10px" }}>
@@ -11984,6 +13087,44 @@ function GoldfishModal({ activeDeck, onClose, onLoadState }) {
                               })()}
                             </div>
                           )}
+
+                          {/* ── Section E: Fastest Wins ── */}
+                          {(() => {
+                            const fastWins = [...(nr.results||[])]
+                              .filter(r => r.winTurn !== null)
+                              .sort((a, b) => a.winTurn - b.winTurn)
+                              .slice(0, 3);
+                            if (!fastWins.length) return null;
+                            return (
+                              <div style={{ marginTop: "14px" }}>
+                                <div style={{ fontFamily: "'Cinzel', serif", fontSize: "9px", color: COLORS.gold, letterSpacing: "1px", marginBottom: "8px" }}>
+                                  ⚡ FASTEST WINS
+                                </div>
+                                {fastWins.map((r, i) => (
+                                  <div key={i} style={{
+                                    marginBottom: "10px", padding: "8px 10px",
+                                    background: "#0a150a", borderRadius: "6px",
+                                    border: `1px solid ${i === 0 ? COLORS.gold + "66" : COLORS.border}`,
+                                  }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", alignItems: "center" }}>
+                                      <span style={{ fontFamily: "'Cinzel', serif", fontSize: "9px", color: i === 0 ? COLORS.gold : COLORS.green2, letterSpacing: "1px" }}>
+                                        {i === 0 ? "★ " : ""}T{r.winTurn} WIN
+                                        {r.mulligans > 0 && <span style={{ color: COLORS.textDim, marginLeft: "6px" }}>{r.mulligans} mull</span>}
+                                      </span>
+                                      <span style={{ fontSize: "9px", color: COLORS.textDim, fontFamily: "'Crimson Text', serif", fontStyle: "italic" }}>
+                                        {r.winCombo || ""}
+                                      </span>
+                                    </div>
+                                    <div style={{ display: "flex", gap: "3px", flexWrap: "wrap" }}>
+                                      {(r.openingHand||[]).map((name, j) => (
+                                        <MiniCardImg key={j} name={name} />
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })()}
